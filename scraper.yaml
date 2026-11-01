@@ -1,0 +1,42 @@
+name: Weekly Ontario Tax Sale Scraper
+
+on:
+  schedule:
+    # Runs automatically every Sunday at 00:00 UTC (Cron format: Min Hour Day Month DayOfWeek)
+    - cron: '0 0 * * 0'
+  # Allows you to manually trigger the scraper anytime from GitHub UI
+  workflow_dispatch:
+
+jobs:
+  scrape-and-commit:
+    runs-on: ubuntu-latest
+
+    steps:
+      # 1. Checkout repository code
+      - name: Checkout Repository
+        uses: actions/checkout@v3
+
+      # 2. Set up Python environment
+      - name: Set up Python
+        uses: actions/setup-python@v4
+        with:
+          python-version: '3.10'
+
+      # 3. Install dependencies
+      - name: Install Dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install requests beautifulsoup4
+
+      # 4. Execute the Python scraper
+      - name: Run Scraper Script
+        run: python scraper.py
+
+      # 5. Commit & push updated listings.json back to repository
+      - name: Commit and Push Updated Data
+        run: |
+          git config --global user.name "github-actions[bot]"
+          git config --global user.email "github-actions[bot]@users.noreply.github.com"
+          git add listings.json
+          git commit -m "Auto-update tax sale listings.json [skip ci]" || exit 0
+          git push

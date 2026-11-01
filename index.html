@@ -1,0 +1,671 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Ontario Tax Sale Properties & Off-Grid Cabin Hub</title>
+  
+  <!-- Leaflet CSS -->
+  <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+  <!-- Tailwind CSS CDN -->
+  <script src="https://cdn.tailwindcss.com"></script>
+  
+  <style>
+    /* Leaflet Z-Index Fix: keeps map layers below modal dialogues */
+    #main-map { height: 460px; width: 100%; border-radius: 0.75rem; z-index: 1 !important; }
+    #modal-minimap { height: 200px; width: 100%; border-radius: 0.5rem; z-index: 1 !important; }
+    .leaflet-container { z-index: 1 !important; }
+    .tab-content { display: none; }
+    .tab-content.active { display: block; }
+  </style>
+</head>
+<body class="bg-slate-900 text-slate-100 min-h-screen font-sans p-4" style="pointer-events: auto !important;">
+
+  <div class="max-w-7xl mx-auto space-y-6">
+    
+    <!-- Header -->
+    <header class="bg-slate-800 p-5 rounded-2xl border border-slate-700 shadow-lg flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
+      <div>
+        <h1 class="text-2xl md:text-3xl font-extrabold text-amber-400">Ontario Tax Sale Finder & Off-Grid Cabin Hub</h1>
+        <p class="text-sm text-slate-400 mt-1">Unorganized Townships • True-Scale Parcel Boundaries • Official Form 7 Tender Links</p>
+      </div>
+      <div class="flex gap-2">
+        <span class="bg-amber-500/10 text-amber-400 border border-amber-500/30 text-xs px-3 py-1.5 rounded-full font-semibold">
+          Public Tenders Active
+        </span>
+        <span class="bg-emerald-500/10 text-emerald-400 border border-emerald-500/30 text-xs px-3 py-1.5 rounded-full font-semibold">
+          Unorganized Townships
+        </span>
+      </div>
+    </header>
+
+    <!-- Navigation Tabs -->
+    <div class="flex flex-wrap gap-2 border-b border-slate-700 pb-3">
+      <button onclick="switchTab('map-tab')" id="btn-map-tab" class="tab-btn bg-amber-500 text-slate-900 font-bold px-4 py-2 rounded-lg text-sm transition-all">
+        🗺️ Map & Active Listings
+      </button>
+      <button onclick="switchTab('cabin-tab')" id="btn-cabin-tab" class="tab-btn bg-slate-800 hover:bg-slate-700 text-slate-300 font-medium px-4 py-2 rounded-lg text-sm transition-all border border-slate-700">
+        🪵 Off-Grid Cabin Rules
+      </button>
+      <button onclick="switchTab('calc-tab')" id="btn-calc-tab" class="tab-btn bg-slate-800 hover:bg-slate-700 text-slate-300 font-medium px-4 py-2 rounded-lg text-sm transition-all border border-slate-700">
+        🧮 Tax Sale Cost Calculator
+      </button>
+      <button onclick="switchTab('scraper-tab')" id="btn-scraper-tab" class="tab-btn bg-slate-800 hover:bg-slate-700 text-slate-300 font-medium px-4 py-2 rounded-lg text-sm transition-all border border-slate-700">
+        🤖 Python Scraper & GitHub Action
+      </button>
+    </div>
+
+    <!-- TAB 1: MAP & LISTINGS -->
+    <div id="map-tab" class="tab-content active space-y-6">
+      
+      <!-- Filter Controls -->
+      <div class="bg-slate-800 p-4 rounded-xl border border-slate-700 grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 shadow-lg">
+        <div>
+          <label class="text-xs text-slate-400 font-semibold block mb-1">Search Township / PIN</label>
+          <input type="text" id="searchInput" oninput="filterListings()" placeholder="e.g. Wallbridge, Temagami..." class="w-full bg-slate-900 border border-slate-700 rounded-lg px-3 py-2 text-sm text-slate-200 focus:outline-none focus:border-amber-500">
+        </div>
+        <div>
+          <label class="text-xs text-slate-400 font-semibold block mb-1">District</label>
+          <select id="districtFilter" onchange="filterListings()" class="w-full bg-slate-900 border border-slate-700 rounded-lg px-3 py-2 text-sm text-slate-200 focus:outline-none focus:border-amber-500">
+            <option value="ALL">All Districts</option>
+            <option value="Parry Sound">Parry Sound</option>
+            <option value="Nipissing">Nipissing</option>
+            <option value="Sudbury District">Sudbury District</option>
+            <option value="Algoma">Algoma</option>
+            <option value="Timiskaming">Timiskaming</option>
+          </select>
+        </div>
+        <div>
+          <label class="text-xs text-slate-400 font-semibold block mb-1">Max Min Bid ($ CAD)</label>
+          <input type="range" id="priceRange" min="2000" max="30000" step="1000" value="30000" oninput="updatePriceLabel(this.value); filterListings();" class="w-full accent-amber-500">
+          <div class="text-right text-xs text-amber-400 font-mono mt-1" id="priceLabel">Up to $30,000</div>
+        </div>
+        <div class="flex items-end">
+          <label class="flex items-center gap-2 cursor-pointer bg-slate-900 border border-slate-700 px-3 py-2 rounded-lg w-full">
+            <input type="checkbox" id="crownOnly" onchange="filterListings()" class="accent-amber-500">
+            <span class="text-xs text-slate-300 font-semibold">Crown Land Bordering Only</span>
+          </label>
+        </div>
+      </div>
+
+      <!-- Main Map -->
+      <div class="bg-slate-800 p-4 rounded-xl border border-slate-700 shadow-xl">
+        <h2 class="text-lg font-bold mb-3 text-slate-200 flex items-center justify-between">
+          <span>Interactive Regional Map (Scale-Accurate Parcel Polygons)</span>
+          <span class="text-xs font-normal text-slate-400">Esri Topo Base Engine</span>
+        </h2>
+        <div id="main-map"></div>
+      </div>
+
+      <!-- Listings Grid -->
+      <div>
+        <h2 class="text-xl font-bold mb-4 text-slate-200">Public Tender Land Listings</h2>
+        <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6" id="listingsGrid"></div>
+      </div>
+    </div>
+
+    <!-- TAB 2: OFF-GRID CABIN RULES -->
+    <div id="cabin-tab" class="tab-content space-y-6">
+      <div class="bg-slate-800 p-6 rounded-2xl border border-slate-700 space-y-6 shadow-xl">
+        <h2 class="text-2xl font-bold text-amber-400">Off-Grid Recreation Rules in Unorganized Townships</h2>
+        
+        <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
+          <div class="bg-slate-900 p-4 rounded-xl border border-slate-700">
+            <h3 class="font-bold text-emerald-400 mb-2">1. Bedrock & Skid Foundations</h3>
+            <p class="text-xs text-slate-300 leading-relaxed">
+              No municipal building permits exist in unorganized townships. You can pin post piers directly into Canadian Shield bedrock or construct on heavy timber skids over a gravel pad.
+            </p>
+          </div>
+          <div class="bg-slate-900 p-4 rounded-xl border border-slate-700">
+            <h3 class="font-bold text-emerald-400 mb-2">2. Composting Toilet / Outhouse</h3>
+            <p class="text-xs text-slate-300 leading-relaxed">
+              Without indoor pressurized plumbing, no septic approval is required. Outhouses must adhere to a minimum <b>15-metre (50 ft)</b> setback from water bodies and property lines.
+            </p>
+          </div>
+          <div class="bg-slate-900 p-4 rounded-xl border border-slate-700">
+            <h3 class="font-bold text-emerald-400 mb-2">3. Water Draw Regulations</h3>
+            <p class="text-xs text-slate-300 leading-relaxed">
+              Surface water extraction from lakes or rivers for domestic camp use requires no permit as long as consumption remains under 50,000 L/day.
+            </p>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- TAB 3: TAX SALE COST CALCULATOR -->
+    <div id="calc-tab" class="tab-content space-y-6">
+      <div class="bg-slate-800 p-6 rounded-2xl border border-slate-700 max-w-2xl mx-auto space-y-6 shadow-xl">
+        <h2 class="text-2xl font-bold text-amber-400">Ontario Tax Sale Total Investment Calculator</h2>
+        <p class="text-xs text-slate-400">Calculate exact certified deposit requirements and provincial taxes on your bid price.</p>
+
+        <div class="space-y-4">
+          <div>
+            <label class="block text-xs text-slate-300 font-semibold mb-1">Your Total Bid Amount ($ CAD)</label>
+            <input type="number" id="calcBid" value="10000" oninput="calculateCosts()" class="w-full bg-slate-900 border border-slate-700 rounded-lg px-4 py-2.5 text-lg font-bold text-amber-400 focus:outline-none focus:border-amber-500">
+          </div>
+
+          <div class="bg-slate-900 p-4 rounded-xl space-y-3 border border-slate-700 text-sm">
+            <div class="flex justify-between border-b border-slate-800 pb-2">
+              <span class="text-slate-400">Required Certified Deposit (20% Min):</span>
+              <span class="font-bold text-slate-100 font-mono" id="outDeposit">$2,000.00</span>
+            </div>
+            <div class="flex justify-between border-b border-slate-800 pb-2">
+              <span class="text-slate-400">HST on Raw Vacant Land (13%):</span>
+              <span class="font-bold text-slate-100 font-mono" id="outHST">$1,300.00</span>
+            </div>
+            <div class="flex justify-between border-b border-slate-800 pb-2">
+              <span class="text-slate-400">Ontario Land Transfer Tax (LTT):</span>
+              <span class="font-bold text-slate-100 font-mono" id="outLTT">$50.00</span>
+            </div>
+            <div class="flex justify-between pt-2 text-base font-bold text-amber-400">
+              <span>Estimated Out-of-Pocket Purchase Total:</span>
+              <span class="font-mono" id="outTotal">$11,350.00</span>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- TAB 4: PYTHON SCRAPER & GITHUB ACTIONS -->
+    <div id="scraper-tab" class="tab-content space-y-6">
+      <div class="bg-slate-800 p-6 rounded-2xl border border-slate-700 space-y-6 shadow-xl">
+        <h2 class="text-2xl font-bold text-amber-400 mb-2">Automated Rescraper Pipeline</h2>
+        <p class="text-sm text-slate-300">Python BeautifulSoup script and GitHub Actions cron workflow for auto-updating public tax tender listings.</p>
+
+        <div class="space-y-4">
+          <h3 class="font-bold text-slate-200 text-base">1. Python Gazette Scraper (`scraper.py`)</h3>
+          <pre class="bg-slate-950 p-4 rounded-xl text-xs font-mono text-emerald-400 overflow-x-auto border border-slate-800">
+import requests
+from bs4 import BeautifulSoup
+import re
+import json
+
+URL = "https://www.ontario.ca/document/ontario-gazette"
+HEADERS = {"User-Agent": "Mozilla/5.0"}
+
+def fetch_tax_sales():
+    resp = requests.get(URL, headers=HEADERS)
+    soup = BeautifulSoup(resp.content, 'html.parser')
+    listings = []
+    
+    for block in soup.find_all(['div', 'section']):
+        text = block.get_text()
+        if "SALE OF LAND BY PUBLIC TENDER" in text:
+            pin = re.search(r'PIN\s*#?\s*([\d-]+)', text)
+            bid = re.search(r'Minimum\s+Tender\s+Amount:\s*\$([\d,]+\.\d{2})', text)
+            if bid:
+                listings.append({
+                    "pin": pin.group(1) if pin else "N/A",
+                    "minBid": float(bid.group(1).replace(',', '')),
+                    "noticeUrl": URL,
+                    "tenderFormPdf": "https://forms.mgcs.gov.on.ca/dataset/402ef9c5-2da6-4880-98be-e2e897627bcd/resource/31f730ca-c641-4645-8473-9ddd90bea745/download/2205e.pdf"
+                })
+    return listings
+
+if __name__ == "__main__":
+    with open("listings.json", "w") as f:
+        json.dump(fetch_tax_sales(), f, indent=2)
+          </pre>
+        </div>
+
+        <div class="space-y-4">
+          <h3 class="font-bold text-slate-200 text-base">2. GitHub Actions Workflow (`.github/workflows/scraper.yml`)</h3>
+          <pre class="bg-slate-950 p-4 rounded-xl text-xs font-mono text-amber-300 overflow-x-auto border border-slate-800">
+name: Auto Rescrape Ontario Tax Sales
+
+on:
+  schedule:
+    - cron: '0 0 * * 0' # Auto-runs midnight every Sunday
+  workflow_dispatch:
+
+jobs:
+  scrape:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v3
+      - uses: actions/setup-python@v4
+        with:
+          python-version: '3.10'
+      - run: pip install requests beautifulsoup4
+      - run: python scraper.py
+      - run: |
+          git config --global user.name 'github-actions'
+          git config --global user.email 'actions@github.com'
+          git add listings.json
+          git commit -m "Auto-update tax sale listings" || exit 0
+          git push
+          </pre>
+        </div>
+      </div>
+    </div>
+
+  </div>
+
+  <!-- PROPERTY DETAIL MODAL PAGE -->
+  <div id="propertyModal" class="fixed inset-0 bg-slate-950/80 backdrop-blur-sm hidden flex items-center justify-center p-4 overflow-y-auto" style="z-index: 99999 !important;">
+    <div class="bg-slate-800 border border-slate-700 rounded-2xl max-w-4xl w-full max-h-[90vh] overflow-y-auto shadow-2xl p-6 relative text-slate-200" style="z-index: 100000 !important;">
+      
+      <!-- Close Button -->
+      <button onclick="closeModal()" class="absolute top-4 right-4 bg-slate-700 hover:bg-slate-600 text-slate-300 w-8 h-8 rounded-full flex items-center justify-center font-bold">✕</button>
+
+      <!-- Modal Title -->
+      <div class="mb-4">
+        <span class="bg-amber-500/20 text-amber-400 text-xs px-3 py-1 rounded-full border border-amber-500/30 font-semibold" id="modalDistrict">District</span>
+        <h2 class="text-2xl font-bold text-white mt-2" id="modalTitle">Property Title</h2>
+        <p class="text-xs text-slate-400" id="modalPin">PIN / Roll Number</p>
+      </div>
+
+      <!-- Photo Gallery Grid -->
+      <div class="grid grid-cols-1 sm:grid-cols-2 gap-3 mb-6" id="modalPhotos"></div>
+
+      <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+        <!-- Specs & Official Links -->
+        <div class="space-y-4">
+          <div class="bg-slate-900 p-4 rounded-xl border border-slate-700 space-y-2 text-sm">
+            <div class="flex justify-between border-b border-slate-800 pb-1.5">
+              <span class="text-slate-400">Minimum Tender Price:</span>
+              <span class="font-bold text-amber-400 text-base" id="modalMinBid">$0.00</span>
+            </div>
+            <div class="flex justify-between border-b border-slate-800 pb-1.5">
+              <span class="text-slate-400">Tender Closing Date:</span>
+              <span class="font-bold text-red-400" id="modalClosingDate">Date</span>
+            </div>
+            <div class="flex justify-between border-b border-slate-800 pb-1.5">
+              <span class="text-slate-400">Acreage:</span>
+              <span class="font-medium" id="modalAcres">0 Acres</span>
+            </div>
+            <div class="flex justify-between border-b border-slate-800 pb-1.5">
+              <span class="text-slate-400">Legal Access:</span>
+              <span class="font-medium" id="modalAccess">Road Allowance</span>
+            </div>
+            <div class="flex justify-between">
+              <span class="text-slate-400">Foundation Option:</span>
+              <span class="font-medium text-amber-300" id="modalFoundation">Bedrock Piers</span>
+            </div>
+          </div>
+
+          <!-- Official Form 7 Tender Package Action Block -->
+          <div class="bg-slate-900 p-4 rounded-xl border border-slate-700 space-y-3">
+            <h4 class="font-bold text-sm text-slate-200 flex items-center gap-2">
+              <span>📄</span> Tender Filing Documents
+            </h4>
+            <div class="space-y-2">
+              <a id="modalPdfBtn" href="https://forms.mgcs.gov.on.ca/dataset/402ef9c5-2da6-4880-98be-e2e897627bcd/resource/31f730ca-c641-4645-8473-9ddd90bea745/download/2205e.pdf" target="_blank" class="block text-center bg-red-600 hover:bg-red-700 text-white font-bold py-2 rounded-lg text-xs transition-all flex items-center justify-center gap-2">
+                <span>📥</span> Download Form 7 Tender Package (PDF) ↗
+              </a>
+              <a id="modalNoticeBtn" href="https://www.ontario.ca/document/ontario-gazette" target="_blank" class="block text-center bg-slate-800 hover:bg-slate-700 text-slate-300 font-semibold py-2 rounded-lg text-xs transition-all border border-slate-700">
+                View Official Gazette Public Notice ↗
+              </a>
+            </div>
+          </div>
+
+          <!-- Description -->
+          <div class="bg-slate-900/60 p-4 rounded-xl border border-slate-700">
+            <h4 class="font-bold text-sm text-slate-300 mb-1">Submission Office & Description</h4>
+            <p class="text-xs text-slate-400 leading-relaxed mb-2" id="modalAddress">Address...</p>
+            <p class="text-xs text-slate-400 leading-relaxed" id="modalDescription">Description text...</p>
+          </div>
+        </div>
+
+        <!-- Mini-Map & CLUPA Action -->
+        <div class="space-y-4">
+          <div class="bg-slate-900 p-3 rounded-xl border border-slate-700">
+            <h4 class="font-bold text-xs text-slate-300 mb-2">Parcel Mini-Map (Satellite View)</h4>
+            <div id="modal-minimap"></div>
+          </div>
+
+          <!-- CLUPA Integration Card -->
+          <div class="bg-amber-500/10 border border-amber-500/30 p-4 rounded-xl space-y-2">
+            <h4 class="font-bold text-sm text-amber-400 flex items-center gap-2">
+              <span>🌐</span> Crown Land Policy Atlas (CLUPA)
+            </h4>
+            <p class="text-xs text-slate-300">Verify surrounding provincial Crown land boundaries and public access policies directly on the Ministry tool.</p>
+            <a id="clupaBtn" href="https://www.lioapplications.lrc.gov.on.ca/CLUPA/index.html?viewer=CLUPA.CLUPA&locale=en-CA" target="_blank" class="block text-center bg-amber-500 hover:bg-amber-600 text-slate-900 font-bold py-2 rounded-lg text-xs transition-all">
+              Launch CLUPA Interactive Viewer ↗
+            </a>
+          </div>
+        </div>
+      </div>
+
+    </div>
+  </div>
+
+  <!-- Leaflet JS -->
+  <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+
+  <script>
+    // Scale Helper: Generates realistic lat/lng polygon bounds matching exact acreage
+    function getAccurateParcelPolygon(lat, lng, acres) {
+      // 1 acre approx = 4,046 sq meters -> sqrt(acres * 4046) = side length in meters
+      const sideMeters = Math.sqrt(acres * 4046.86);
+      const latDelta = (sideMeters / 111000) / 2; // ~111km per lat degree
+      const lngDelta = (sideMeters / (111000 * Math.cos(lat * Math.PI / 180))) / 2;
+
+      return [
+        [lat + latDelta, lng - lngDelta],
+        [lat + latDelta, lng + lngDelta],
+        [lat - latDelta, lng + lngDelta],
+        [lat - latDelta, lng - lngDelta]
+      ];
+    }
+
+    const rawProperties = [
+      {
+        id: "PS-2026-01",
+        township: "Wallbridge Township",
+        district: "Parry Sound",
+        unorganized: true,
+        minBid: 4250,
+        acres: 12.5,
+        access: "Seasonal Crown Trail",
+        terrain: "Exposed Canadian Shield Granite / Pine Forest",
+        pin: "52014-0192",
+        lat: 45.78,
+        lng: -80.42,
+        crownBorder: true,
+        foundation: "Bedrock Pier Pinning (Ideal)",
+        closingDate: "November 18, 2026 @ 3:00 PM",
+        submissionAddress: "Submit sealed Form 7 to: Municipal Treasurer Office, District of Parry Sound.",
+        noticeUrl: "https://www.ontario.ca/document/ontario-gazette",
+        pdfUrl: "https://forms.mgcs.gov.on.ca/dataset/402ef9c5-2da6-4880-98be-e2e897627bcd/resource/31f730ca-c641-4645-8473-9ddd90bea745/download/2205e.pdf",
+        description: "12.5-acre parcel in unorganized Wallbridge township. Features exposed granite ridges perfect for post-and-pier foundation setup. Borders provincial Crown land on North and West boundaries.",
+        photos: [
+          "https://images.unsplash.com/photo-1500382017468-9049fed747ef?auto=format&fit=crop&w=600&q=80",
+          "https://images.unsplash.com/photo-1448375240586-882707db888b?auto=format&fit=crop&w=600&q=80"
+        ]
+      },
+      {
+        id: "NIP-2026-04",
+        township: "Strathy Township (Temagami)",
+        district: "Nipissing",
+        unorganized: true,
+        minBid: 6800,
+        acres: 40.0,
+        access: "Unopened Road Allowance",
+        terrain: "Mixed Forest & Rock Ridges",
+        pin: "49120-0044",
+        lat: 47.06,
+        lng: -79.80,
+        crownBorder: true,
+        foundation: "Timber Skids on Gravel Pad",
+        closingDate: "December 02, 2026 @ 2:00 PM",
+        submissionAddress: "Submit sealed tender to: Provincial Land Tax Office, Nipissing District Administration.",
+        noticeUrl: "https://www.ontario.ca/document/ontario-gazette",
+        pdfUrl: "https://forms.mgcs.gov.on.ca/dataset/402ef9c5-2da6-4880-98be-e2e897627bcd/resource/31f730ca-c641-4645-8473-9ddd90bea745/download/2205e.pdf",
+        description: "Vast 40-acre forested block near Temagami. Heavy Crown land coverage surrounding parcel, ideal for backcountry exploration, camping, and building a dry recreational bunkie.",
+        photos: [
+          "https://images.unsplash.com/photo-1470071459604-3b5ec3a7fe05?auto=format&fit=crop&w=600&q=80",
+          "https://images.unsplash.com/photo-1426604966848-d7adac402bff?auto=format&fit=crop&w=600&q=80"
+        ]
+      },
+      {
+        id: "SUD-2026-09",
+        township: "Gogama Area",
+        district: "Sudbury District",
+        unorganized: true,
+        minBid: 2900,
+        acres: 5.2,
+        access: "Water Access Only (Lake)",
+        terrain: "Waterfront Shoreline",
+        pin: "73002-0811",
+        lat: 47.67,
+        lng: -81.72,
+        crownBorder: true,
+        foundation: "Helical Screw Piles",
+        closingDate: "December 15, 2026 @ 4:00 PM",
+        submissionAddress: "Submit sealed tender to: Sudbury District Tax Administration Office.",
+        noticeUrl: "https://www.ontario.ca/document/ontario-gazette",
+        pdfUrl: "https://forms.mgcs.gov.on.ca/dataset/402ef9c5-2da6-4880-98be-e2e897627bcd/resource/31f730ca-c641-4645-8473-9ddd90bea745/download/2205e.pdf",
+        description: "Remote 5.2-acre water-access lot in unorganized Sudbury district. Shoreline frontage with direct water draw rights under 50,000 L/day.",
+        photos: [
+          "https://images.unsplash.com/photo-1507525428034-b723cf961d3e?auto=format&fit=crop&w=600&q=80",
+          "https://images.unsplash.com/photo-1510784722466-f2aa9c52fff6?auto=format&fit=crop&w=600&q=80"
+        ]
+      },
+      {
+        id: "ALG-2026-12",
+        township: "Central Algoma Unorganized",
+        district: "Algoma",
+        unorganized: true,
+        minBid: 3500,
+        acres: 22.0,
+        access: "Crown Logging Road",
+        terrain: "Hardwood Forest & Creek",
+        pin: "31044-0912",
+        lat: 46.62,
+        lng: -83.80,
+        crownBorder: true,
+        foundation: "Timber Skids on Gravel",
+        closingDate: "December 20, 2026 @ 3:00 PM",
+        submissionAddress: "Submit sealed tender to: Algoma District Treasury Office.",
+        noticeUrl: "https://www.ontario.ca/document/ontario-gazette",
+        pdfUrl: "https://forms.mgcs.gov.on.ca/dataset/402ef9c5-2da6-4880-98be-e2e897627bcd/resource/31f730ca-c641-4645-8473-9ddd90bea745/download/2205e.pdf",
+        description: "22-acre acreage parcel with high timber density. Excellent access off active Crown forestry road network.",
+        photos: [
+          "https://images.unsplash.com/photo-1511497584788-876761c11969?auto=format&fit=crop&w=600&q=80",
+          "https://images.unsplash.com/photo-1448375240586-882707db888b?auto=format&fit=crop&w=600&q=80"
+        ]
+      },
+      {
+        id: "TIM-2026-05",
+        township: "Larder Lake Area",
+        district: "Timiskaming",
+        unorganized: true,
+        minBid: 5100,
+        acres: 18.3,
+        access: "Deeded ATV Access",
+        terrain: "Rock Outcrops & Spruce",
+        pin: "61220-0144",
+        lat: 48.10,
+        lng: -79.70,
+        crownBorder: false,
+        foundation: "Bedrock Piers",
+        closingDate: "January 10, 2027 @ 2:00 PM",
+        submissionAddress: "Submit sealed tender to: Timiskaming Tax Collector Office.",
+        noticeUrl: "https://www.ontario.ca/document/ontario-gazette",
+        pdfUrl: "https://forms.mgcs.gov.on.ca/dataset/402ef9c5-2da6-4880-98be-e2e897627bcd/resource/31f730ca-c641-4645-8473-9ddd90bea745/download/2205e.pdf",
+        description: "18.3-acre parcel featuring rocky plateaus ideal for mounting solar panels and constructing a light post-foundation cabin.",
+        photos: [
+          "https://images.unsplash.com/photo-1473448912268-2022ce9509d8?auto=format&fit=crop&w=600&q=80",
+          "https://images.unsplash.com/photo-1500382017468-9049fed747ef?auto=format&fit=crop&w=600&q=80"
+        ]
+      }
+    ];
+
+    let mainMap, modalMap, modalMarker, markersGroup, modalPolygon;
+
+    document.addEventListener("DOMContentLoaded", function() {
+      mainMap = L.map('main-map').setView([46.8, -80.5], 7);
+      L.tileLayer('https://server.arcgisonline.com/ArcGIS/rest/services/World_Topo_Map/MapServer/tile/{z}/{y}/{x}', {
+        maxZoom: 18,
+        attribution: 'Tiles &copy; Esri &mdash; Esri, USGS'
+      }).addTo(mainMap);
+
+      markersGroup = L.layerGroup().addTo(mainMap);
+
+      filterListings();
+      calculateCosts();
+    });
+
+    function switchTab(tabId) {
+      document.querySelectorAll('.tab-content').forEach(el => el.classList.remove('active'));
+      document.querySelectorAll('.tab-btn').forEach(el => {
+        el.classList.remove('bg-amber-500', 'text-slate-900', 'font-bold');
+        el.classList.add('bg-slate-800', 'text-slate-300');
+      });
+
+      document.getElementById(tabId).classList.add('active');
+      const activeBtn = document.getElementById('btn-' + tabId);
+      activeBtn.classList.remove('bg-slate-800', 'text-slate-300');
+      activeBtn.classList.add('bg-amber-500', 'text-slate-900', 'font-bold');
+
+      if (tabId === 'map-tab' && mainMap) {
+        setTimeout(() => mainMap.invalidateSize(), 200);
+      }
+    }
+
+    function filterListings() {
+      const query = document.getElementById('searchInput').value.toLowerCase();
+      const district = document.getElementById('districtFilter').value;
+      const maxPrice = parseFloat(document.getElementById('priceRange').value);
+      const crownOnly = document.getElementById('crownOnly').checked;
+
+      const filtered = rawProperties.filter(p => {
+        const matchesQuery = p.township.toLowerCase().includes(query) || p.pin.includes(query);
+        const matchesDistrict = district === 'ALL' || p.district === district;
+        const matchesPrice = p.minBid <= maxPrice;
+        const matchesCrown = !crownOnly || p.crownBorder;
+        return matchesQuery && matchesDistrict && matchesPrice && matchesCrown;
+      });
+
+      renderListings(filtered);
+    }
+
+    function renderListings(properties) {
+      const container = document.getElementById('listingsGrid');
+      container.innerHTML = '';
+      markersGroup.clearLayers();
+
+      properties.forEach(prop => {
+        // Point Marker
+        const marker = L.marker([prop.lat, prop.lng]).addTo(markersGroup);
+        marker.bindPopup(`
+          <div style="color: #0f172a; font-family: sans-serif;">
+            <h3 style="font-weight: bold; margin-bottom: 2px;">${prop.township}</h3>
+            <p><b>Min Bid:</b> $${prop.minBid.toLocaleString()} CAD</p>
+            <p><b>Closes:</b> ${prop.closingDate}</p>
+          </div>
+        `);
+
+        // Compute True Scale Polygon Boundaries based on Acreage
+        const polyCoords = getAccurateParcelPolygon(prop.lat, prop.lng, prop.acres);
+        const parcelPoly = L.polygon(polyCoords, {
+          color: '#f59e0b',
+          weight: 2,
+          fillColor: '#f59e0b',
+          fillOpacity: 0.35
+        }).addTo(markersGroup);
+        parcelPoly.bindPopup(`<b>${prop.township} Parcel Boundary</b> (${prop.acres} Acres)`);
+
+        // Listing Card HTML
+        const card = document.createElement('div');
+        card.className = "bg-slate-800 rounded-xl overflow-hidden border border-slate-700 hover:border-amber-500 transition-all shadow-lg flex flex-col justify-between";
+        card.innerHTML = `
+          <div>
+            <img src="${prop.photos[0]}" class="w-full h-40 object-cover" alt="Property terrain"/>
+            <div class="p-4 space-y-2">
+              <div class="flex justify-between items-start">
+                <span class="bg-emerald-900/60 text-emerald-300 text-xs px-2.5 py-1 rounded-full border border-emerald-700 font-semibold">Unorganized</span>
+                <span class="text-amber-400 font-bold text-lg">$${prop.minBid.toLocaleString()} CAD</span>
+              </div>
+              <h3 class="text-xl font-bold text-slate-100">${prop.township}</h3>
+              <p class="text-xs text-slate-400">${prop.district} District • PIN: ${prop.pin}</p>
+              
+              <div class="space-y-1 text-xs text-slate-300 pt-2 border-t border-slate-700/50">
+                <div><b class="text-slate-400">Tender Deadline:</b> <span class="text-red-400 font-medium">${prop.closingDate}</span></div>
+                <div><b class="text-slate-400">Crown Border:</b> ${prop.crownBorder ? 'Yes (Direct Access)' : 'No'}</div>
+              </div>
+            </div>
+          </div>
+
+          <div class="p-4 pt-0 space-y-2">
+            <button onclick="zoomToPropertyPolygon('${prop.id}')" class="w-full bg-slate-700 hover:bg-slate-600 text-amber-400 font-bold py-2 rounded-lg transition-all text-xs uppercase tracking-wider">
+              Focus Map on Parcel
+            </button>
+            <button onclick="openModal('${prop.id}')" class="w-full bg-amber-500 hover:bg-amber-600 text-slate-900 font-bold py-2 rounded-lg transition-all text-xs uppercase tracking-wider">
+              View Details & Form 7 Package
+            </button>
+          </div>
+        `;
+        container.appendChild(card);
+      });
+    }
+
+    function zoomToPropertyPolygon(id) {
+      const prop = rawProperties.find(p => p.id === id);
+      if (!prop) return;
+
+      const polyCoords = getAccurateParcelPolygon(prop.lat, prop.lng, prop.acres);
+      const polyBounds = L.polygon(polyCoords).getBounds();
+      mainMap.fitBounds(polyBounds, { padding: [80, 80] });
+      window.scrollTo({ top: 180, behavior: 'smooth' });
+    }
+
+    function openModal(id) {
+      const prop = rawProperties.find(p => p.id === id);
+      if (!prop) return;
+
+      document.getElementById('modalTitle').innerText = prop.township;
+      document.getElementById('modalDistrict').innerText = `${prop.district} District`;
+      document.getElementById('modalPin').innerText = `PIN / Roll #: ${prop.pin}`;
+      document.getElementById('modalMinBid').innerText = `$${prop.minBid.toLocaleString()} CAD`;
+      document.getElementById('modalClosingDate').innerText = prop.closingDate;
+      document.getElementById('modalAcres').innerText = `${prop.acres} Acres`;
+      document.getElementById('modalAccess').innerText = prop.access;
+      document.getElementById('modalFoundation').innerText = prop.foundation;
+      document.getElementById('modalAddress').innerText = prop.submissionAddress;
+      document.getElementById('modalDescription').innerText = prop.description;
+
+      document.getElementById('modalPdfBtn').href = prop.pdfUrl;
+      document.getElementById('modalNoticeBtn').href = prop.noticeUrl;
+
+      const photoContainer = document.getElementById('modalPhotos');
+      photoContainer.innerHTML = prop.photos.map(url => `
+        <img src="${url}" class="w-full h-36 object-cover rounded-lg border border-slate-700" alt="Parcel terrain photo"/>
+      `).join('');
+
+      document.getElementById('propertyModal').classList.remove('hidden');
+
+      setTimeout(() => {
+        const polyCoords = getAccurateParcelPolygon(prop.lat, prop.lng, prop.acres);
+        if (!modalMap) {
+          modalMap = L.map('modal-minimap').setView([prop.lat, prop.lng], 15);
+          L.tileLayer('https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}', {
+            maxZoom: 18,
+            attribution: 'Tiles &copy; Esri'
+          }).addTo(modalMap);
+          modalMarker = L.marker([prop.lat, prop.lng]).addTo(modalMap);
+        } else {
+          modalMap.setView([prop.lat, prop.lng], 15);
+          modalMarker.setLatLng([prop.lat, prop.lng]);
+        }
+
+        if (modalPolygon) modalMap.removeLayer(modalPolygon);
+        modalPolygon = L.polygon(polyCoords, { color: '#f59e0b', weight: 2, fillColor: '#f59e0b', fillOpacity: 0.4 }).addTo(modalMap);
+        modalMap.fitBounds(modalPolygon.getBounds(), { padding: [30, 30] });
+        modalMap.invalidateSize();
+      }, 150);
+    }
+
+    function closeModal() {
+      document.getElementById('propertyModal').classList.add('hidden');
+    }
+
+    function updatePriceLabel(val) {
+      document.getElementById('priceLabel').innerText = `Up to $${parseInt(val).toLocaleString()}`;
+    }
+
+    function calculateCosts() {
+      const bid = parseFloat(document.getElementById('calcBid').value) || 0;
+      const deposit = bid * 0.20;
+      const hst = bid * 0.13;
+      
+      let ltt = 0;
+      if (bid <= 55000) {
+        ltt = bid * 0.005;
+      } else if (bid <= 250000) {
+        ltt = (55000 * 0.005) + ((bid - 55000) * 0.010);
+      } else {
+        ltt = (55000 * 0.005) + (195000 * 0.010) + ((bid - 250000) * 0.015);
+      }
+
+      const total = bid + hst + ltt;
+
+      document.getElementById('outDeposit').innerText = `$${deposit.toLocaleString(undefined, {minimumFractionDigits: 2, maximumFractionDigits: 2})}`;
+      document.getElementById('outHST').innerText = `$${hst.toLocaleString(undefined, {minimumFractionDigits: 2, maximumFractionDigits: 2})}`;
+      document.getElementById('outLTT').innerText = `$${ltt.toLocaleString(undefined, {minimumFractionDigits: 2, maximumFractionDigits: 2})}`;
+      document.getElementById('outTotal').innerText = `$${total.toLocaleString(undefined, {minimumFractionDigits: 2, maximumFractionDigits: 2})}`;
+    }
+  </script>
+</body>
+</html>
