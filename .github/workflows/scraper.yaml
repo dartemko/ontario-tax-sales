@@ -1,43 +1,42 @@
-name: Weekly Ontario Tax Sale Scraper
+name: Weekly Ontario Tax Sale Scraper & Pages Deploy
 
 on:
   schedule:
     - cron: '0 0 * * 0' # Auto-runs midnight every Sunday
   workflow_dispatch:
+  push:
+    branches:
+      - main
+
+permissions:
+  contents: write
+  pages: write
+  id-token: write
+
+concurrency:
+  group: "pages"
+  cancel-in-progress: true
 
 jobs:
   scrape-and-commit:
     runs-on: ubuntu-latest
-
     steps:
-      # 1. Updated to latest Node 24-native release
       - name: Checkout Repository
         uses: actions/checkout@v7
 
-      # 2. Updated to latest Node 24-native release
       - name: Set up Python
         uses: actions/setup-python@v7
         with:
           python-version: '3.10'
 
-      # 3. Install dependencies
       - name: Install Dependencies
         run: |
           python -m pip install --upgrade pip
           pip install requests beautifulsoup4
 
-      # 4. Execute the Python scraper
       - name: Run Scraper Script
         run: python scraper.py
 
-      # 5. Optional: If uploading output artifacts, use v7
-      - name: Upload Listings Artifact
-        uses: actions/upload-artifact@v7
-        with:
-          name: tax-sale-listings
-          path: listings.json
-
-      # 6. Commit & push updated listings.json back to repository
       - name: Commit and Push Updated Data
         run: |
           git config --global user.name "github-actions[bot]"
@@ -45,3 +44,29 @@ jobs:
           git add listings.json
           git commit -m "Auto-update tax sale listings.json [skip ci]" || exit 0
           git push
+
+  build-pages:
+    needs: scrape-and-commit
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout Repository
+        uses: actions/checkout@v7
+
+      - name: Setup Pages
+        uses: actions/configure-pages@v6
+
+      - name: Upload Artifact for GitHub Pages
+        uses: actions/upload-pages-artifact@v3
+        with:
+          path: '.'
+
+  deploy-pages:
+    needs: build-pages
+    runs-on: ubuntu-latest
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - name: Deploy to GitHub Pages
+        id: deployment
+        uses: actions/deploy-pages@v5
