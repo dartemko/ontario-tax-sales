@@ -474,8 +474,8 @@ jobs:
 
     let mainMap, modalMap, modalMarker, markersGroup, modalPolygon;
 
-    document.addEventListener("DOMContentLoaded", async function() {
-  // Initialize Leaflet Map
+  document.addEventListener("DOMContentLoaded", async function() {
+  // Initialize Map
   mainMap = L.map('main-map').setView([46.8, -80.5], 7);
   L.tileLayer('https://server.arcgisonline.com/ArcGIS/rest/services/World_Topo_Map/MapServer/tile/{z}/{y}/{x}', {
     maxZoom: 18,
@@ -484,32 +484,32 @@ jobs:
 
   markersGroup = L.layerGroup().addTo(mainMap);
 
-  // Fetch scraped JSON listings dynamically
+  // Fetch live scraped JSON
   try {
-    const res = await fetch('./listings.json');
+    const res = await fetch('./listings.json?cachebust=' + new Date().getTime());
     if (res.ok) {
       const liveData = await res.json();
       if (Array.isArray(liveData) && liveData.length > 0) {
-        // Map raw scraped records into the web UI format
+        // Map raw scraped records to interactive map objects
         rawProperties = liveData.map((item, index) => ({
           id: `SCRAPED-${index}`,
-          township: item.township || "Ontario Unorganized Lot",
+          township: item.township || "Ontario Unorganized Township",
           district: item.district || "Northern District",
           unorganized: true,
           minBid: item.minBid || 0,
-          acres: item.acres || 10.0,
-          access: item.access || "Road Allowance / Crown Access",
-          terrain: "Mixed Boreal Forest / Canadian Shield",
+          acres: item.acres || 15.0,
+          access: "Crown Road Allowance",
+          terrain: "Mixed Forest & Canadian Shield",
           pin: item.pin || "N/A",
-          lat: item.lat || (46.0 + (index * 0.4)),
-          lng: item.lng || (-80.0 - (index * 0.3)),
+          lat: 45.5 + (index * 0.35),
+          lng: -80.2 - (index * 0.25),
           crownBorder: true,
           foundation: "Bedrock Piers / Skids",
-          closingDate: item.closingDate || "See Tender Package",
-          submissionAddress: item.submissionAddress || "Refer to Official Notice",
+          closingDate: item.closingDate || "See Notice",
+          submissionAddress: "Refer to Official Gazette Notice",
           noticeUrl: item.noticeUrl || "https://www.ontario.ca/document/ontario-gazette",
           pdfUrl: item.pdfUrl || "https://forms.mgcs.gov.on.ca/dataset/402ef9c5-2da6-4880-98be-e2e897627bcd/resource/31f730ca-c641-4645-8473-9ddd90bea745/download/2205e.pdf",
-          description: item.description || "Public tender notice for tax sale land.",
+          description: item.description || "Public tender land sale.",
           photos: [
             "https://images.unsplash.com/photo-1500382017468-9049fed747ef?auto=format&fit=crop&w=600&q=80",
             "https://images.unsplash.com/photo-1448375240586-882707db888b?auto=format&fit=crop&w=600&q=80"
@@ -518,7 +518,7 @@ jobs:
       }
     }
   } catch (err) {
-    console.log("Could not load listings.json, using default fallback dataset.", err);
+    console.log("Using fallback property list.", err);
   }
 
   filterListings();
