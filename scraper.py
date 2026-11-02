@@ -116,6 +116,7 @@ def scrape_tax_sales():
             if pin and pin not in seen_pins and bid:
                 seen_pins.add(pin)
                 muni_name = muni_match.group(2).strip() if muni_match else "Ontario Municipality"
+                muni_name = re.split(r"\s+Take Notice\b", muni_name, maxsplit=1, flags=re.IGNORECASE)[0].strip()
                 lat, lng = get_coords_from_pin(pin, muni_name)
                 
                 clean_desc = re.sub(r'\s+', ' ', chunk).strip()

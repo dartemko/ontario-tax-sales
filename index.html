@@ -347,6 +347,43 @@
       ];
     }
 
+    function hasValidCoordinates(property) {
+      return Number.isFinite(property.lat) && Number.isFinite(property.lng) &&
+        Math.abs(property.lat) <= 90 && Math.abs(property.lng) <= 180;
+    }
+
+    async function resolveCoordinates(item) {
+      const lat = Number(item.lat);
+      const lng = Number(item.lng);
+      if (Number.isFinite(lat) && Number.isFinite(lng) && Math.abs(lat) <= 90 && Math.abs(lng) <= 180) {
+        return { lat, lng };
+      }
+
+      const township = String(item.township || "").split(/\s+Take Notice\b/i)[0].trim();
+      if (!township) return null;
+
+      try {
+        const url = new URL('https://geocode.arcgis.com/arcgis/rest/services/World/GeocodeServer/findAddressCandidates');
+        url.search = new URLSearchParams({
+          SingleLine: `${township}, Ontario, Canada`,
+          f: 'json',
+          outFields: '*',
+          maxLocations: '1'
+        });
+        const response = await fetch(url);
+        if (!response.ok) return null;
+        const candidates = (await response.json()).candidates || [];
+        const location = candidates[0]?.location;
+        if (location && Number.isFinite(location.y) && Number.isFinite(location.x)) {
+          return { lat: location.y, lng: location.x };
+        }
+      } catch (error) {
+        console.warn(`Could not resolve location for ${township}.`, error);
+      }
+
+      return null;
+    }
+
     let mainMap, modalMap, modalMarker, markersGroup, modalPolygon;
     let rawProperties = [];
 
@@ -365,7 +402,9 @@
         if (response.ok) {
           const liveData = await response.json();
           if (Array.isArray(liveData) && liveData.length > 0) {
-            rawProperties = liveData.map((item, index) => ({
+            rawProperties = await Promise.all(liveData.map(async (item, index) => {
+              const coordinates = await resolveCoordinates(item);
+              return {
               id: `SCRAPED-${index}`,
               township: item.township || "Ontario Township",
               district: item.district || "Northern District",
@@ -375,8 +414,8 @@
               access: "Crown Road Allowance",
               terrain: "Canadian Shield Granite / Forest",
               pin: item.pin || "N/A",
-              lat: 45.8 + (index * 0.45),
-              lng: -80.2 - (index * 0.35),
+              lat: coordinates?.lat ?? null,
+              lng: coordinates?.lng ?? null,
               crownBorder: true,
               foundation: "Bedrock Piers / Skids",
               closingDate: item.closingDate || "See Tender Package",
@@ -388,6 +427,7 @@
                 "https://images.unsplash.com/photo-1500382017468-9049fed747ef?auto=format&fit=crop&w=600&q=80",
                 "https://images.unsplash.com/photo-1448375240586-882707db888b?auto=format&fit=crop&w=600&q=80"
               ]
+              };
             }));
           }
         }
@@ -444,23 +484,25 @@
       markersGroup.clearLayers();
 
       properties.forEach(prop => {
-        const marker = L.marker([prop.lat, prop.lng]).addTo(markersGroup);
-        marker.bindPopup(`
+        if (hasValidCoordinates(prop)) {
+          const marker = L.marker([prop.lat, prop.lng]).addTo(markersGroup);
+          marker.bindPopup(`
           <div style="color: #0f172a; font-family: sans-serif;">
             <h3 style="font-weight: bold; margin-bottom: 2px;">${prop.township}</h3>
             <p><b>Min Bid:</b> $${prop.minBid.toLocaleString()} CAD</p>
             <p><b>Closes:</b> ${prop.closingDate}</p>
           </div>
-        `);
+          `);
 
-        const polyCoords = getAccurateParcelPolygon(prop.lat, prop.lng, prop.acres);
-        const parcelPoly = L.polygon(polyCoords, {
+          const polyCoords = getAccurateParcelPolygon(prop.lat, prop.lng, prop.acres);
+          const parcelPoly = L.polygon(polyCoords, {
           color: '#f59e0b',
           weight: 2,
           fillColor: '#f59e0b',
           fillOpacity: 0.35
-        }).addTo(markersGroup);
-        parcelPoly.bindPopup(`<b>${prop.township} Parcel Boundary</b> (${prop.acres} Acres)`);
+          }).addTo(markersGroup);
+          parcelPoly.bindPopup(`<b>${prop.township} Parcel Boundary</b> (${prop.acres} Acres)`);
+        }
 
         const card = document.createElement('div');
         card.className = "bg-slate-800 rounded-xl overflow-hidden border border-slate-700 hover:border-amber-500 transition-all shadow-lg flex flex-col justify-between";
@@ -497,7 +539,7 @@
 
     function zoomToPropertyPolygon(id) {
       const prop = rawProperties.find(p => p.id === id);
-      if (!prop) return;
+      if (!prop || !hasValidCoordinates(prop)) return;
 
       const polyCoords = getAccurateParcelPolygon(prop.lat, prop.lng, prop.acres);
       const polyBounds = L.polygon(polyCoords).getBounds();
