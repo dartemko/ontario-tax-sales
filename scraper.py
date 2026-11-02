@@ -2,10 +2,61 @@ import requests
 from bs4 import BeautifulSoup
 import re
 import json
+import os
 
 SEARCH_URL = "https://www.ontario.ca/search/ontario-gazette"
 BASE_DOMAIN = "https://www.ontario.ca"
 HEADERS = {"User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64)"}
+LIO_PARCEL_QUERY_URL = os.environ.get("LIO_PARCEL_QUERY_URL")
+
+def get_coords_from_pin(pin, township):
+    if LIO_PARCEL_QUERY_URL:
+        try:
+            safe_pin = pin.replace("'", "''")
+            response = requests.get(
+                LIO_PARCEL_QUERY_URL,
+                params={
+                    "where": f"PIN = '{safe_pin}'",
+                    "outFields": "*",
+                    "returnGeometry": "true",
+                    "returnCentroid": "true",
+                    "outSR": "4326",
+                    "f": "json",
+                },
+                headers=HEADERS,
+                timeout=15,
+            )
+            response.raise_for_status()
+            features = response.json().get("features", [])
+            if features:
+                geometry = features[0].get("geometry", {})
+                point = geometry.get("centroid", geometry)
+                if "x" in point and "y" in point:
+                    return float(point["y"]), float(point["x"])
+        except (requests.RequestException, ValueError, TypeError) as error:
+            print(f"LIO coordinate lookup failed for PIN {pin}: {error}")
+
+    try:
+        response = requests.get(
+            "https://geocode.arcgis.com/arcgis/rest/services/World/GeocodeServer/findAddressCandidates",
+            params={
+                "SingleLine": f"{township}, Ontario, Canada",
+                "f": "json",
+                "outFields": "*",
+                "maxLocations": 1,
+            },
+            headers=HEADERS,
+            timeout=15,
+        )
+        response.raise_for_status()
+        candidates = response.json().get("candidates", [])
+        if candidates:
+            location = candidates[0]["location"]
+            return float(location["y"]), float(location["x"])
+    except (requests.RequestException, ValueError, TypeError, KeyError) as error:
+        print(f"Township coordinate lookup failed for {township}: {error}")
+
+    return None, None
 
 def get_latest_gazette_issue_url():
     try:
@@ -65,6 +116,7 @@ def scrape_tax_sales():
             if pin and pin not in seen_pins and bid:
                 seen_pins.add(pin)
                 muni_name = muni_match.group(2).strip() if muni_match else "Ontario Municipality"
+                lat, lng = get_coords_from_pin(pin, muni_name)
                 
                 clean_desc = re.sub(r'\s+', ' ', chunk).strip()
                 if len(clean_desc) > 300:
@@ -72,6 +124,8 @@ def scrape_tax_sales():
 
                 listings.append({
                     "pin": pin,
+                    "lat": lat,
+                    "lng": lng,
                     "roll": roll_match.group(1).strip() if roll_match else "N/A",
                     "township": muni_name,
                     "district": "Ontario District",
