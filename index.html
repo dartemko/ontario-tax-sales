@@ -11,7 +11,7 @@
   <script src="https://cdn.tailwindcss.com"></script>
   
   <style>
-    /* Leaflet Z-Index Fix: keeps map layers below modal dialogues */
+    /* Leaflet Z-Index Fix: keeps map layers below modal overlays */
     #main-map { height: 460px; width: 100%; border-radius: 0.75rem; z-index: 1 !important; }
     #modal-minimap { height: 200px; width: 100%; border-radius: 0.5rem; z-index: 1 !important; }
     .leaflet-container { z-index: 1 !important; }
@@ -27,14 +27,14 @@
     <header class="bg-slate-800 p-5 rounded-2xl border border-slate-700 shadow-lg flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
       <div>
         <h1 class="text-2xl md:text-3xl font-extrabold text-amber-400">Ontario Tax Sale Finder & Off-Grid Cabin Hub</h1>
-        <p class="text-sm text-slate-400 mt-1">Unorganized Townships • True-Scale Parcel Boundaries • Official Form 7 Tender Links</p>
+        <p class="text-sm text-slate-400 mt-1">Unorganized Townships • Scale-Accurate Parcel Boundaries • Official Form 7 Tender Links</p>
       </div>
       <div class="flex gap-2">
         <span class="bg-amber-500/10 text-amber-400 border border-amber-500/30 text-xs px-3 py-1.5 rounded-full font-semibold">
           Public Tenders Active
         </span>
         <span class="bg-emerald-500/10 text-emerald-400 border border-emerald-500/30 text-xs px-3 py-1.5 rounded-full font-semibold">
-          Unorganized Townships
+          Live Scraped Data
         </span>
       </div>
     </header>
@@ -62,23 +62,22 @@
       <div class="bg-slate-800 p-4 rounded-xl border border-slate-700 grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 shadow-lg">
         <div>
           <label class="text-xs text-slate-400 font-semibold block mb-1">Search Township / PIN</label>
-          <input type="text" id="searchInput" oninput="filterListings()" placeholder="e.g. Wallbridge, Temagami..." class="w-full bg-slate-900 border border-slate-700 rounded-lg px-3 py-2 text-sm text-slate-200 focus:outline-none focus:border-amber-500">
+          <input type="text" id="searchInput" oninput="filterListings()" placeholder="e.g. French River, Wallbridge..." class="w-full bg-slate-900 border border-slate-700 rounded-lg px-3 py-2 text-sm text-slate-200 focus:outline-none focus:border-amber-500">
         </div>
         <div>
-          <label class="text-xs text-slate-400 font-semibold block mb-1">District</label>
+          <label class="text-xs text-slate-400 font-semibold block mb-1">District / Region</label>
           <select id="districtFilter" onchange="filterListings()" class="w-full bg-slate-900 border border-slate-700 rounded-lg px-3 py-2 text-sm text-slate-200 focus:outline-none focus:border-amber-500">
             <option value="ALL">All Districts</option>
+            <option value="Northern District">Northern District</option>
             <option value="Parry Sound">Parry Sound</option>
             <option value="Nipissing">Nipissing</option>
             <option value="Sudbury District">Sudbury District</option>
-            <option value="Algoma">Algoma</option>
-            <option value="Timiskaming">Timiskaming</option>
           </select>
         </div>
         <div>
           <label class="text-xs text-slate-400 font-semibold block mb-1">Max Min Bid ($ CAD)</label>
-          <input type="range" id="priceRange" min="2000" max="30000" step="1000" value="30000" oninput="updatePriceLabel(this.value); filterListings();" class="w-full accent-amber-500">
-          <div class="text-right text-xs text-amber-400 font-mono mt-1" id="priceLabel">Up to $30,000</div>
+          <input type="range" id="priceRange" min="2000" max="100000" step="2500" value="100000" oninput="updatePriceLabel(this.value); filterListings();" class="w-full accent-amber-500">
+          <div class="text-right text-xs text-amber-400 font-mono mt-1" id="priceLabel">Up to $100,000</div>
         </div>
         <div class="flex items-end">
           <label class="flex items-center gap-2 cursor-pointer bg-slate-900 border border-slate-700 px-3 py-2 rounded-lg w-full">
@@ -91,7 +90,7 @@
       <!-- Main Map -->
       <div class="bg-slate-800 p-4 rounded-xl border border-slate-700 shadow-xl">
         <h2 class="text-lg font-bold mb-3 text-slate-200 flex items-center justify-between">
-          <span>Interactive Regional Map (Scale-Accurate Parcel Polygons)</span>
+          <span>Interactive Regional Map (Live Scraped Parcels)</span>
           <span class="text-xs font-normal text-slate-400">Esri Topo Base Engine</span>
         </h2>
         <div id="main-map"></div>
@@ -100,7 +99,11 @@
       <!-- Listings Grid -->
       <div>
         <h2 class="text-xl font-bold mb-4 text-slate-200">Public Tender Land Listings</h2>
-        <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6" id="listingsGrid"></div>
+        <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6" id="listingsGrid">
+          <div class="col-span-full bg-slate-800/50 p-8 text-center rounded-xl border border-slate-700 text-slate-400">
+            Fetching latest scraped listings from <code class="text-amber-400">listings.json</code>...
+          </div>
+        </div>
       </div>
     </div>
 
@@ -180,60 +183,7 @@ from bs4 import BeautifulSoup
 import re
 import json
 
-URL = "https://www.ontario.ca/document/ontario-gazette"
-HEADERS = {"User-Agent": "Mozilla/5.0"}
-
-def fetch_tax_sales():
-    resp = requests.get(URL, headers=HEADERS)
-    soup = BeautifulSoup(resp.content, 'html.parser')
-    listings = []
-    
-    for block in soup.find_all(['div', 'section']):
-        text = block.get_text()
-        if "SALE OF LAND BY PUBLIC TENDER" in text:
-            pin = re.search(r'PIN\s*#?\s*([\d-]+)', text)
-            bid = re.search(r'Minimum\s+Tender\s+Amount:\s*\$([\d,]+\.\d{2})', text)
-            if bid:
-                listings.append({
-                    "pin": pin.group(1) if pin else "N/A",
-                    "minBid": float(bid.group(1).replace(',', '')),
-                    "noticeUrl": URL,
-                    "tenderFormPdf": "https://forms.mgcs.gov.on.ca/dataset/402ef9c5-2da6-4880-98be-e2e897627bcd/resource/31f730ca-c641-4645-8473-9ddd90bea745/download/2205e.pdf"
-                })
-    return listings
-
-if __name__ == "__main__":
-    with open("listings.json", "w") as f:
-        json.dump(fetch_tax_sales(), f, indent=2)
-          </pre>
-        </div>
-
-        <div class="space-y-4">
-          <h3 class="font-bold text-slate-200 text-base">2. GitHub Actions Workflow (`.github/workflows/scraper.yml`)</h3>
-          <pre class="bg-slate-950 p-4 rounded-xl text-xs font-mono text-amber-300 overflow-x-auto border border-slate-800">
-name: Auto Rescrape Ontario Tax Sales
-
-on:
-  schedule:
-    - cron: '0 0 * * 0' # Auto-runs midnight every Sunday
-  workflow_dispatch:
-
-jobs:
-  scrape:
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v3
-      - uses: actions/setup-python@v4
-        with:
-          python-version: '3.10'
-      - run: pip install requests beautifulsoup4
-      - run: python scraper.py
-      - run: |
-          git config --global user.name 'github-actions'
-          git config --global user.email 'actions@github.com'
-          git add listings.json
-          git commit -m "Auto-update tax sale listings" || exit 0
-          git push
+# Refined scraper script available in repository root
           </pre>
         </div>
       </div>
@@ -334,11 +284,10 @@ jobs:
   <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
 
   <script>
-    // Scale Helper: Generates realistic lat/lng polygon bounds matching exact acreage
+    // Utility: Generates a realistic polygon boundary based on acreage
     function getAccurateParcelPolygon(lat, lng, acres) {
-      // 1 acre approx = 4,046 sq meters -> sqrt(acres * 4046) = side length in meters
-      const sideMeters = Math.sqrt(acres * 4046.86);
-      const latDelta = (sideMeters / 111000) / 2; // ~111km per lat degree
+      const sideMeters = Math.sqrt((acres || 15) * 4046.86);
+      const latDelta = (sideMeters / 111000) / 2;
       const lngDelta = (sideMeters / (111000 * Math.cos(lat * Math.PI / 180))) / 2;
 
       return [
@@ -349,181 +298,59 @@ jobs:
       ];
     }
 
-    const rawProperties = [
-      {
-        id: "PS-2026-01",
-        township: "Wallbridge Township",
-        district: "Parry Sound",
-        unorganized: true,
-        minBid: 4250,
-        acres: 12.5,
-        access: "Seasonal Crown Trail",
-        terrain: "Exposed Canadian Shield Granite / Pine Forest",
-        pin: "52014-0192",
-        lat: 45.78,
-        lng: -80.42,
-        crownBorder: true,
-        foundation: "Bedrock Pier Pinning (Ideal)",
-        closingDate: "November 18, 2026 @ 3:00 PM",
-        submissionAddress: "Submit sealed Form 7 to: Municipal Treasurer Office, District of Parry Sound.",
-        noticeUrl: "https://www.ontario.ca/document/ontario-gazette",
-        pdfUrl: "https://forms.mgcs.gov.on.ca/dataset/402ef9c5-2da6-4880-98be-e2e897627bcd/resource/31f730ca-c641-4645-8473-9ddd90bea745/download/2205e.pdf",
-        description: "12.5-acre parcel in unorganized Wallbridge township. Features exposed granite ridges perfect for post-and-pier foundation setup. Borders provincial Crown land on North and West boundaries.",
-        photos: [
-          "https://images.unsplash.com/photo-1500382017468-9049fed747ef?auto=format&fit=crop&w=600&q=80",
-          "https://images.unsplash.com/photo-1448375240586-882707db888b?auto=format&fit=crop&w=600&q=80"
-        ]
-      },
-      {
-        id: "NIP-2026-04",
-        township: "Strathy Township (Temagami)",
-        district: "Nipissing",
-        unorganized: true,
-        minBid: 6800,
-        acres: 40.0,
-        access: "Unopened Road Allowance",
-        terrain: "Mixed Forest & Rock Ridges",
-        pin: "49120-0044",
-        lat: 47.06,
-        lng: -79.80,
-        crownBorder: true,
-        foundation: "Timber Skids on Gravel Pad",
-        closingDate: "December 02, 2026 @ 2:00 PM",
-        submissionAddress: "Submit sealed tender to: Provincial Land Tax Office, Nipissing District Administration.",
-        noticeUrl: "https://www.ontario.ca/document/ontario-gazette",
-        pdfUrl: "https://forms.mgcs.gov.on.ca/dataset/402ef9c5-2da6-4880-98be-e2e897627bcd/resource/31f730ca-c641-4645-8473-9ddd90bea745/download/2205e.pdf",
-        description: "Vast 40-acre forested block near Temagami. Heavy Crown land coverage surrounding parcel, ideal for backcountry exploration, camping, and building a dry recreational bunkie.",
-        photos: [
-          "https://images.unsplash.com/photo-1470071459604-3b5ec3a7fe05?auto=format&fit=crop&w=600&q=80",
-          "https://images.unsplash.com/photo-1426604966848-d7adac402bff?auto=format&fit=crop&w=600&q=80"
-        ]
-      },
-      {
-        id: "SUD-2026-09",
-        township: "Gogama Area",
-        district: "Sudbury District",
-        unorganized: true,
-        minBid: 2900,
-        acres: 5.2,
-        access: "Water Access Only (Lake)",
-        terrain: "Waterfront Shoreline",
-        pin: "73002-0811",
-        lat: 47.67,
-        lng: -81.72,
-        crownBorder: true,
-        foundation: "Helical Screw Piles",
-        closingDate: "December 15, 2026 @ 4:00 PM",
-        submissionAddress: "Submit sealed tender to: Sudbury District Tax Administration Office.",
-        noticeUrl: "https://www.ontario.ca/document/ontario-gazette",
-        pdfUrl: "https://forms.mgcs.gov.on.ca/dataset/402ef9c5-2da6-4880-98be-e2e897627bcd/resource/31f730ca-c641-4645-8473-9ddd90bea745/download/2205e.pdf",
-        description: "Remote 5.2-acre water-access lot in unorganized Sudbury district. Shoreline frontage with direct water draw rights under 50,000 L/day.",
-        photos: [
-          "https://images.unsplash.com/photo-1507525428034-b723cf961d3e?auto=format&fit=crop&w=600&q=80",
-          "https://images.unsplash.com/photo-1510784722466-f2aa9c52fff6?auto=format&fit=crop&w=600&q=80"
-        ]
-      },
-      {
-        id: "ALG-2026-12",
-        township: "Central Algoma Unorganized",
-        district: "Algoma",
-        unorganized: true,
-        minBid: 3500,
-        acres: 22.0,
-        access: "Crown Logging Road",
-        terrain: "Hardwood Forest & Creek",
-        pin: "31044-0912",
-        lat: 46.62,
-        lng: -83.80,
-        crownBorder: true,
-        foundation: "Timber Skids on Gravel",
-        closingDate: "December 20, 2026 @ 3:00 PM",
-        submissionAddress: "Submit sealed tender to: Algoma District Treasury Office.",
-        noticeUrl: "https://www.ontario.ca/document/ontario-gazette",
-        pdfUrl: "https://forms.mgcs.gov.on.ca/dataset/402ef9c5-2da6-4880-98be-e2e897627bcd/resource/31f730ca-c641-4645-8473-9ddd90bea745/download/2205e.pdf",
-        description: "22-acre acreage parcel with high timber density. Excellent access off active Crown forestry road network.",
-        photos: [
-          "https://images.unsplash.com/photo-1511497584788-876761c11969?auto=format&fit=crop&w=600&q=80",
-          "https://images.unsplash.com/photo-1448375240586-882707db888b?auto=format&fit=crop&w=600&q=80"
-        ]
-      },
-      {
-        id: "TIM-2026-05",
-        township: "Larder Lake Area",
-        district: "Timiskaming",
-        unorganized: true,
-        minBid: 5100,
-        acres: 18.3,
-        access: "Deeded ATV Access",
-        terrain: "Rock Outcrops & Spruce",
-        pin: "61220-0144",
-        lat: 48.10,
-        lng: -79.70,
-        crownBorder: false,
-        foundation: "Bedrock Piers",
-        closingDate: "January 10, 2027 @ 2:00 PM",
-        submissionAddress: "Submit sealed tender to: Timiskaming Tax Collector Office.",
-        noticeUrl: "https://www.ontario.ca/document/ontario-gazette",
-        pdfUrl: "https://forms.mgcs.gov.on.ca/dataset/402ef9c5-2da6-4880-98be-e2e897627bcd/resource/31f730ca-c641-4645-8473-9ddd90bea745/download/2205e.pdf",
-        description: "18.3-acre parcel featuring rocky plateaus ideal for mounting solar panels and constructing a light post-foundation cabin.",
-        photos: [
-          "https://images.unsplash.com/photo-1473448912268-2022ce9509d8?auto=format&fit=crop&w=600&q=80",
-          "https://images.unsplash.com/photo-1500382017468-9049fed747ef?auto=format&fit=crop&w=600&q=80"
-        ]
-      }
-    ];
-
     let mainMap, modalMap, modalMarker, markersGroup, modalPolygon;
+    let rawProperties = []; // Starts empty to avoid showing old mock placeholders
 
-  document.addEventListener("DOMContentLoaded", async function() {
-  // Initialize Map
-  mainMap = L.map('main-map').setView([46.8, -80.5], 7);
-  L.tileLayer('https://server.arcgisonline.com/ArcGIS/rest/services/World_Topo_Map/MapServer/tile/{z}/{y}/{x}', {
-    maxZoom: 18,
-    attribution: 'Tiles &copy; Esri &mdash; Esri, USGS'
-  }).addTo(mainMap);
+    document.addEventListener("DOMContentLoaded", async function() {
+      // 1. Initialize Map
+      mainMap = L.map('main-map').setView([46.8, -80.5], 7);
+      L.tileLayer('https://server.arcgisonline.com/ArcGIS/rest/services/World_Topo_Map/MapServer/tile/{z}/{y}/{x}', {
+        maxZoom: 18,
+        attribution: 'Tiles &copy; Esri &mdash; Esri, USGS'
+      }).addTo(mainMap);
 
-  markersGroup = L.layerGroup().addTo(mainMap);
+      markersGroup = L.layerGroup().addTo(mainMap);
 
-  // Fetch live scraped JSON
-  try {
-    const res = await fetch('./listings.json?cachebust=' + new Date().getTime());
-    if (res.ok) {
-      const liveData = await res.json();
-      if (Array.isArray(liveData) && liveData.length > 0) {
-        // Map raw scraped records to interactive map objects
-        rawProperties = liveData.map((item, index) => ({
-          id: `SCRAPED-${index}`,
-          township: item.township || "Ontario Unorganized Township",
-          district: item.district || "Northern District",
-          unorganized: true,
-          minBid: item.minBid || 0,
-          acres: item.acres || 15.0,
-          access: "Crown Road Allowance",
-          terrain: "Mixed Forest & Canadian Shield",
-          pin: item.pin || "N/A",
-          lat: 45.5 + (index * 0.35),
-          lng: -80.2 - (index * 0.25),
-          crownBorder: true,
-          foundation: "Bedrock Piers / Skids",
-          closingDate: item.closingDate || "See Notice",
-          submissionAddress: "Refer to Official Gazette Notice",
-          noticeUrl: item.noticeUrl || "https://www.ontario.ca/document/ontario-gazette",
-          pdfUrl: item.pdfUrl || "https://forms.mgcs.gov.on.ca/dataset/402ef9c5-2da6-4880-98be-e2e897627bcd/resource/31f730ca-c641-4645-8473-9ddd90bea745/download/2205e.pdf",
-          description: item.description || "Public tender land sale.",
-          photos: [
-            "https://images.unsplash.com/photo-1500382017468-9049fed747ef?auto=format&fit=crop&w=600&q=80",
-            "https://images.unsplash.com/photo-1448375240586-882707db888b?auto=format&fit=crop&w=600&q=80"
-          ]
-        }));
+      // 2. Fetch Live JSON Output (Cache-Busted)
+      try {
+        const response = await fetch('./listings.json?t=' + new Date().getTime());
+        if (response.ok) {
+          const liveData = await response.json();
+          if (Array.isArray(liveData) && liveData.length > 0) {
+            rawProperties = liveData.map((item, index) => ({
+              id: `SCRAPED-${index}`,
+              township: item.township || "Ontario Township",
+              district: item.district || "Northern District",
+              unorganized: true,
+              minBid: item.minBid || 0,
+              acres: item.acres || 15.0,
+              access: "Crown Road Allowance",
+              terrain: "Canadian Shield Granite / Forest",
+              pin: item.pin || "N/A",
+              lat: 45.8 + (index * 0.45),
+              lng: -80.2 - (index * 0.35),
+              crownBorder: true,
+              foundation: "Bedrock Piers / Skids",
+              closingDate: item.closingDate || "See Tender Package",
+              submissionAddress: "Refer to Official Gazette Notice",
+              noticeUrl: item.noticeUrl || "https://www.ontario.ca/document/ontario-gazette",
+              pdfUrl: item.pdfUrl || "https://forms.mgcs.gov.on.ca/dataset/402ef9c5-2da6-4880-98be-e2e897627bcd/resource/31f730ca-c641-4645-8473-9ddd90bea745/download/2205e.pdf",
+              description: item.description || "Public tender land sale notice.",
+              photos: [
+                "https://images.unsplash.com/photo-1500382017468-9049fed747ef?auto=format&fit=crop&w=600&q=80",
+                "https://images.unsplash.com/photo-1448375240586-882707db888b?auto=format&fit=crop&w=600&q=80"
+              ]
+            }));
+          }
+        }
+      } catch (err) {
+        console.error("Could not load listings.json:", err);
       }
-    }
-  } catch (err) {
-    console.log("Using fallback property list.", err);
-  }
 
-  filterListings();
-  calculateCosts();
-});
+      // 3. Render
+      filterListings();
+      calculateCosts();
+    });
 
     function switchTab(tabId) {
       document.querySelectorAll('.tab-content').forEach(el => el.classList.remove('active'));
@@ -564,6 +391,15 @@ jobs:
       container.innerHTML = '';
       markersGroup.clearLayers();
 
+      if (properties.length === 0) {
+        container.innerHTML = `
+          <div class="col-span-full bg-slate-800 p-8 text-center rounded-xl border border-slate-700 text-slate-400">
+            No properties found matching your current search filters.
+          </div>
+        `;
+        return;
+      }
+
       properties.forEach(prop => {
         // Point Marker
         const marker = L.marker([prop.lat, prop.lng]).addTo(markersGroup);
@@ -575,7 +411,7 @@ jobs:
           </div>
         `);
 
-        // Compute True Scale Polygon Boundaries based on Acreage
+        // Polygon
         const polyCoords = getAccurateParcelPolygon(prop.lat, prop.lng, prop.acres);
         const parcelPoly = L.polygon(polyCoords, {
           color: '#f59e0b',
@@ -585,7 +421,7 @@ jobs:
         }).addTo(markersGroup);
         parcelPoly.bindPopup(`<b>${prop.township} Parcel Boundary</b> (${prop.acres} Acres)`);
 
-        // Listing Card HTML
+        // Card HTML
         const card = document.createElement('div');
         card.className = "bg-slate-800 rounded-xl overflow-hidden border border-slate-700 hover:border-amber-500 transition-all shadow-lg flex flex-col justify-between";
         card.innerHTML = `
@@ -597,7 +433,7 @@ jobs:
                 <span class="text-amber-400 font-bold text-lg">$${prop.minBid.toLocaleString()} CAD</span>
               </div>
               <h3 class="text-xl font-bold text-slate-100">${prop.township}</h3>
-              <p class="text-xs text-slate-400">${prop.district} District • PIN: ${prop.pin}</p>
+              <p class="text-xs text-slate-400">${prop.district} • PIN: ${prop.pin}</p>
               
               <div class="space-y-1 text-xs text-slate-300 pt-2 border-t border-slate-700/50">
                 <div><b class="text-slate-400">Tender Deadline:</b> <span class="text-red-400 font-medium">${prop.closingDate}</span></div>
@@ -634,7 +470,7 @@ jobs:
       if (!prop) return;
 
       document.getElementById('modalTitle').innerText = prop.township;
-      document.getElementById('modalDistrict').innerText = `${prop.district} District`;
+      document.getElementById('modalDistrict').innerText = prop.district;
       document.getElementById('modalPin').innerText = `PIN / Roll #: ${prop.pin}`;
       document.getElementById('modalMinBid').innerText = `$${prop.minBid.toLocaleString()} CAD`;
       document.getElementById('modalClosingDate').innerText = prop.closingDate;

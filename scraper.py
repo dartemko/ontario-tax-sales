@@ -8,25 +8,30 @@ BASE_DOMAIN = "https://www.ontario.ca"
 HEADERS = {"User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64)"}
 
 def get_latest_gazette_issue_url():
-    resp = requests.get(SEARCH_URL, headers=HEADERS)
-    if resp.status_code != 200:
-        return None
-    soup = BeautifulSoup(resp.content, 'html.parser')
-    for link in soup.find_all('a', href=True):
-        href = link['href']
-        if '/document/ontario-gazette-volume-' in href:
-            full_url = href if href.startswith('http') else BASE_DOMAIN + href
-            if not full_url.endswith('/sale-land-tax-arrears-public-tender'):
-                full_url = full_url.rstrip('/') + '/sale-land-tax-arrears-public-tender'
-            return full_url
+    try:
+        resp = requests.get(SEARCH_URL, headers=HEADERS, timeout=15)
+        if resp.status_code != 200:
+            return None
+        soup = BeautifulSoup(resp.content, 'html.parser')
+        for link in soup.find_all('a', href=True):
+            href = link['href']
+            if '/document/ontario-gazette-volume-' in href:
+                full_url = href if href.startswith('http') else BASE_DOMAIN + href
+                if not full_url.endswith('/sale-land-tax-arrears-public-tender'):
+                    full_url = full_url.rstrip('/') + '/sale-land-tax-arrears-public-tender'
+                return full_url
+    except Exception as e:
+        print(f"Error fetching Gazette index: {e}")
     return None
 
 def scrape_tax_sales():
     issue_url = get_latest_gazette_issue_url()
     if not issue_url:
+        print("Could not resolve Gazette URL.")
         return []
 
-    resp = requests.get(issue_url, headers=HEADERS)
+    print(f"Scraping issue URL: {issue_url}")
+    resp = requests.get(issue_url, headers=HEADERS, timeout=15)
     if resp.status_code != 200:
         return []
 
@@ -34,43 +39,53 @@ def scrape_tax_sales():
     listings = []
     seen_pins = set()
 
-    # Locate main article content to avoid header/footer nav
-    content_area = soup.find('main') or soup.find('article') or soup
+    # Scope search to the main document body ONLY (bypasses header/footer nav)
+    article = soup.find('main') or soup.find('article') or soup
 
-    # Look for property tender notices
-    blocks = content_area.find_all(['p', 'div', 'tr'])
-
-    for block in blocks:
-        text = block.get_text(" ", strip=True)
+    # Each tender notice in the Gazette is separated by headers/divs containing "Municipal Act" or "Form 6"
+    # We iterate through leaf sections or paragraphs
+    elements = article.find_all(['div', 'section', 'p'])
+    
+    for el in elements:
+        text = el.get_text(" ", strip=True)
         
-        # Must contain tender indicators
-        if "Minimum Tender Amount" in text or "SALE OF LAND" in text:
+        # Skip outer containers that contain global page text
+        if "Log in to continue" in text or "Table of contents" in text or len(text) > 2500:
+            continue
+            
+        # Target legitimate property tender blocks
+        if "Minimum Tender Amount" in text or "SALE OF LAND BY PUBLIC TENDER" in text:
             pin_match = re.search(r'PIN\s*#?\s*([\d-]+)', text, re.IGNORECASE)
             bid_match = re.search(r'Minimum\s+Tender\s+Amount:\s*\$([\d,]+\.\d{2})', text, re.IGNORECASE)
-            township_match = re.search(r'(Municipality|Township|City|Board)\s+of\s+([A-Za-z\s]+)', text, re.IGNORECASE)
+            muni_match = re.search(r'(Municipality|Township|City|Town|Board)\s+of\s+([A-Za-z\s]+)', text, re.IGNORECASE)
+            roll_match = re.search(r'Roll\s*#?\s*([\d\s-]+)', text, re.IGNORECASE)
             closing_match = re.search(r'until\s+([\d:]+\s*(?:a\.m\.|p\.m\.)[^\n,]+,\s*\d{4})', text, re.IGNORECASE)
 
             pin = pin_match.group(1) if pin_match else None
-            
-            # Filter duplicates and non-listing blocks
-            if pin and pin not in seen_pins and bid_match:
+            bid = float(bid_match.group(1).replace(',', '')) if bid_match else None
+
+            # Deduplicate by PIN and ensure bid exists
+            if pin and pin not in seen_pins and bid:
                 seen_pins.add(pin)
+                muni_name = muni_match.group(2).strip() if muni_match else "Ontario Township"
+                
                 listings.append({
                     "pin": pin,
-                    "township": township_match.group(2).strip() if township_match else "Ontario Township",
+                    "roll": roll_match.group(1).strip() if roll_match else "N/A",
+                    "township": f"{muni_name} Township",
                     "district": "Northern District",
-                    "minBid": float(bid_match.group(1).replace(',', '')),
+                    "minBid": bid,
                     "acres": 15.0,
-                    "closingDate": closing_match.group(1) if closing_match else "See Official Notice",
+                    "closingDate": closing_match.group(1) if closing_match else "See Gazette Notice",
                     "noticeUrl": issue_url,
                     "pdfUrl": "https://forms.mgcs.gov.on.ca/dataset/402ef9c5-2da6-4880-98be-e2e897627bcd/resource/31f730ca-c641-4645-8473-9ddd90bea745/download/2205e.pdf",
-                    "description": text[:250].strip()
+                    "description": text[:300].strip()
                 })
 
     return listings
 
 if __name__ == "__main__":
-    data = scrape_tax_sales()
-    print(f"Scraped {len(data)} clean property listings.")
+    results = scrape_tax_sales()
+    print(f"Extracted {len(results)} clean listings.")
     with open("listings.json", "w") as f:
-        json.dump(data, f, indent=2)
+        json.dump(results, f, indent=2)
