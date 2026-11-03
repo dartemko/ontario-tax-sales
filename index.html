@@ -478,6 +478,37 @@
       renderListings(filtered);
     }
 
+    function createPropertyPopup(prop) {
+      const popup = document.createElement('div');
+      popup.style.color = '#0f172a';
+      popup.style.fontFamily = 'sans-serif';
+
+      const title = document.createElement('h3');
+      title.textContent = prop.township;
+      title.style.fontWeight = 'bold';
+      title.style.marginBottom = '2px';
+      popup.appendChild(title);
+
+      const minBid = document.createElement('p');
+      minBid.innerHTML = '<b>Min Bid:</b> ';
+      minBid.append(`$${prop.minBid.toLocaleString()} CAD`);
+      popup.appendChild(minBid);
+
+      const closingDate = document.createElement('p');
+      closingDate.innerHTML = '<b>Closes:</b> ';
+      closingDate.append(prop.closingDate);
+      popup.appendChild(closingDate);
+
+      const viewButton = document.createElement('button');
+      viewButton.type = 'button';
+      viewButton.textContent = 'View listing';
+      viewButton.style.cssText = 'display:block;width:100%;margin-top:8px;padding:8px 12px;border:0;border-radius:6px;background:#f59e0b;color:#0f172a;font-weight:700;cursor:pointer;';
+      viewButton.addEventListener('click', () => openModal(prop.id));
+      popup.appendChild(viewButton);
+
+      return popup;
+    }
+
     function renderListings(properties) {
       const container = document.getElementById('listingsGrid');
       container.innerHTML = '';
@@ -486,13 +517,7 @@
       properties.forEach(prop => {
         if (hasValidCoordinates(prop)) {
           const marker = L.marker([prop.lat, prop.lng]).addTo(markersGroup);
-          marker.bindPopup(`
-          <div style="color: #0f172a; font-family: sans-serif;">
-            <h3 style="font-weight: bold; margin-bottom: 2px;">${prop.township}</h3>
-            <p><b>Min Bid:</b> $${prop.minBid.toLocaleString()} CAD</p>
-            <p><b>Closes:</b> ${prop.closingDate}</p>
-          </div>
-          `);
+          marker.bindPopup(createPropertyPopup(prop));
 
           const polyCoords = getAccurateParcelPolygon(prop.lat, prop.lng, prop.acres);
           const parcelPoly = L.polygon(polyCoords, {
