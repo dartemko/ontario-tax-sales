@@ -230,6 +230,7 @@
           <div class="bg-slate-900/60 p-4 rounded-xl border border-slate-700">
             <h4 class="font-bold text-sm text-slate-300 mb-1">Property Address & Tender Details</h4>
             <p class="text-xs text-slate-400 leading-relaxed mb-2" id="modalPropertyAddress">Property address...</p>
+            <a id="modalGoogleMapsBtn" href="#" target="_blank" rel="noopener noreferrer" class="hidden text-xs text-amber-400 hover:text-amber-300 underline mb-2">Search address on Google Maps ↗</a>
             <p class="text-xs text-slate-400 leading-relaxed mb-2" id="modalAddress">Submission office...</p>
             <p class="text-xs text-slate-400 leading-relaxed" id="modalDescription">Description text...</p>
           </div>
@@ -608,6 +609,17 @@
       document.getElementById('modalFoundation').innerText = prop.foundation;
       document.getElementById('modalPropertyAddress').innerText =
         `Property address: ${prop.propertyAddress || 'Not stated in Gazette notice'}`;
+      const googleMapsBtn = document.getElementById('modalGoogleMapsBtn');
+      if (prop.propertyAddress) {
+        const searchAddress = [prop.propertyAddress, prop.township, 'Ontario', 'Canada']
+          .filter(Boolean)
+          .join(', ');
+        googleMapsBtn.href = `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(searchAddress)}`;
+        googleMapsBtn.classList.remove('hidden');
+      } else {
+        googleMapsBtn.removeAttribute('href');
+        googleMapsBtn.classList.add('hidden');
+      }
       document.getElementById('modalAddress').innerText =
         `Submission office: ${prop.submissionAddress || 'See official Gazette notice'}`;
       document.getElementById('modalDescription').innerText = prop.description;
