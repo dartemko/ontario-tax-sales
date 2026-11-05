@@ -2,6 +2,7 @@
   {
     "pin": "73446-0001",
     "address": "1326 Mayer Rd , Noelville, ON , P0M 2N0",
+    "assessedValue": 260000.0,
     "geometry": null,
     "lat": 46.022116,
     "lng": -80.572359,
@@ -18,6 +19,7 @@
   {
     "pin": "73455-0115",
     "address": "29 Zettler Bay Rd S",
+    "assessedValue": 265000.0,
     "geometry": null,
     "lat": 46.022116,
     "lng": -80.572359,
@@ -34,6 +36,7 @@
   {
     "pin": "17140-0320",
     "address": "23 Canada Street",
+    "assessedValue": 354000.0,
     "geometry": null,
     "lat": 43.25549,
     "lng": -79.873376,
@@ -50,6 +53,7 @@
   {
     "pin": "17162-0085",
     "address": "142 Barton Street East PT LT 28 PL 287 as in AB99668, S/T VM275088, S/T interest in VM275088",
+    "assessedValue": 200000.0,
     "geometry": null,
     "lat": 43.25549,
     "lng": -79.873376,
@@ -66,6 +70,7 @@
   {
     "pin": "17162-0086",
     "address": "144 Barton Street East",
+    "assessedValue": 287000.0,
     "geometry": null,
     "lat": 43.25549,
     "lng": -79.873376,
@@ -82,6 +87,7 @@
   {
     "pin": "17213-0026",
     "address": "48-50 Somerset Avenue",
+    "assessedValue": 66000.0,
     "geometry": null,
     "lat": 43.25549,
     "lng": -79.873376,
@@ -98,6 +104,7 @@
   {
     "pin": "17218-0016",
     "address": "388 Sherman Avenue North",
+    "assessedValue": 222000.0,
     "geometry": null,
     "lat": 43.25549,
     "lng": -79.873376,
@@ -114,6 +121,7 @@
   {
     "pin": "17227-0205",
     "address": "28 Kensington Avenue North",
+    "assessedValue": 210000.0,
     "geometry": null,
     "lat": 43.25549,
     "lng": -79.873376,
@@ -130,6 +138,7 @@
   {
     "pin": "17221-0346",
     "address": "145 Glendale Avenue North",
+    "assessedValue": 159000.0,
     "geometry": null,
     "lat": 43.25549,
     "lng": -79.873376,
@@ -146,6 +155,7 @@
   {
     "pin": "17232-0187",
     "address": "241 Province Street South",
+    "assessedValue": 260000.0,
     "geometry": null,
     "lat": 43.25549,
     "lng": -79.873376,
@@ -162,6 +172,7 @@
   {
     "pin": "17106-0024",
     "address": "73 Greenhill Avenue",
+    "assessedValue": 441000.0,
     "geometry": null,
     "lat": 43.25549,
     "lng": -79.873376,
@@ -178,6 +189,7 @@
   {
     "pin": "17571-0431",
     "address": "163-165 Beach Boulevard",
+    "assessedValue": 411000.0,
     "geometry": null,
     "lat": 43.25549,
     "lng": -79.873376,
@@ -194,6 +206,7 @@
   {
     "pin": "16925-0041",
     "address": "952 Stone Church Road East",
+    "assessedValue": 400000.0,
     "geometry": null,
     "lat": 43.25549,
     "lng": -79.873376,
@@ -210,6 +223,7 @@
   {
     "pin": "17371-0017",
     "address": null,
+    "assessedValue": 531000.0,
     "geometry": null,
     "lat": 43.25549,
     "lng": -79.873376,
@@ -226,6 +240,7 @@
   {
     "pin": "17564-1011",
     "address": "0 Lime Kiln Road",
+    "assessedValue": 449000.0,
     "geometry": null,
     "lat": 43.25549,
     "lng": -79.873376,
@@ -242,6 +257,7 @@
   {
     "pin": "17441-0027",
     "address": "33 Alterra Boulevard",
+    "assessedValue": 619000.0,
     "geometry": null,
     "lat": 43.25549,
     "lng": -79.873376,
@@ -258,6 +274,7 @@
   {
     "pin": "17441-0074",
     "address": "0 Seymour Drive",
+    "assessedValue": 300.0,
     "geometry": null,
     "lat": 43.25549,
     "lng": -79.873376,
@@ -274,6 +291,7 @@
   {
     "pin": "17414-0104",
     "address": "125 Miller Drive",
+    "assessedValue": 693000.0,
     "geometry": null,
     "lat": 43.25549,
     "lng": -79.873376,
@@ -290,6 +308,7 @@
   {
     "pin": "17477-0262",
     "address": "50-62 Cootes Drive",
+    "assessedValue": 1409000.0,
     "geometry": null,
     "lat": 43.25549,
     "lng": -79.873376,
@@ -306,6 +325,7 @@
   {
     "pin": "17477-0247",
     "address": "0 East Street",
+    "assessedValue": 79000.0,
     "geometry": null,
     "lat": 43.25549,
     "lng": -79.873376,
@@ -322,6 +342,7 @@
   {
     "pin": "17477-0259",
     "address": "0 Cootes Drive",
+    "assessedValue": 183000.0,
     "geometry": null,
     "lat": 43.25549,
     "lng": -79.873376,
@@ -338,6 +359,7 @@
   {
     "pin": "35258-0138",
     "address": null,
+    "assessedValue": 154000.0,
     "geometry": null,
     "lat": 42.766555476,
     "lng": -81.08525325,
@@ -354,6 +376,7 @@
   {
     "pin": "71271-0154",
     "address": "184 Dawson Rd. , Guelph",
+    "assessedValue": 697000.0,
     "geometry": null,
     "lat": 43.543498,
     "lng": -80.248275,
@@ -370,6 +393,7 @@
   {
     "pin": "28090-0228",
     "address": "215 Park St N ., Peterborough, ON",
+    "assessedValue": null,
     "geometry": null,
     "lat": 44.304358,
     "lng": -78.327377,
@@ -386,6 +410,7 @@
   {
     "pin": "28090-0229",
     "address": "219 Park St N ., Peterborough, ON",
+    "assessedValue": null,
     "geometry": null,
     "lat": 44.304358,
     "lng": -78.327377,
@@ -402,6 +427,7 @@
   {
     "pin": "26818-0052",
     "address": null,
+    "assessedValue": 38000.0,
     "geometry": null,
     "lat": 44.170115,
     "lng": -78.894457,
@@ -418,6 +444,7 @@
   {
     "pin": "26769-0075",
     "address": "12 Davidge Dr. , Port Perry",
+    "assessedValue": 283000.0,
     "geometry": null,
     "lat": 44.170115,
     "lng": -78.894457,
@@ -434,6 +461,7 @@
   {
     "pin": "26774-0043",
     "address": "52 Percy Cres. , Port Perry",
+    "assessedValue": 247000.0,
     "geometry": null,
     "lat": 44.170115,
     "lng": -78.894457,
@@ -450,6 +478,7 @@
   {
     "pin": "26776-0155",
     "address": null,
+    "assessedValue": 76000.0,
     "geometry": null,
     "lat": 44.170115,
     "lng": -78.894457,
@@ -466,6 +495,7 @@
   {
     "pin": "26758-0092",
     "address": "111 Summit Dr. , Caesarea",
+    "assessedValue": 313000.0,
     "geometry": null,
     "lat": 44.170115,
     "lng": -78.894457,
@@ -482,6 +512,7 @@
   {
     "pin": "26758-0088",
     "address": "87 Summit Dr. , Caesarea",
+    "assessedValue": 243000.0,
     "geometry": null,
     "lat": 44.170115,
     "lng": -78.894457,
@@ -498,6 +529,7 @@
   {
     "pin": "26755-0136",
     "address": "3675 Durham Regional Rd. 57, Caesarea",
+    "assessedValue": 237000.0,
     "geometry": null,
     "lat": 44.170115,
     "lng": -78.894457,
@@ -514,6 +546,7 @@
   {
     "pin": "26756-0054",
     "address": "3751 Proutt Rd. , Nestleton Station",
+    "assessedValue": 111000.0,
     "geometry": null,
     "lat": 44.170115,
     "lng": -78.894457,
@@ -530,6 +563,7 @@
   {
     "pin": "26754-0200",
     "address": "7 Wingrove Lane, Nestleton Station",
+    "assessedValue": 95000.0,
     "geometry": null,
     "lat": 44.170115,
     "lng": -78.894457,
@@ -546,6 +580,7 @@
   {
     "pin": "26754-0301",
     "address": "3 Prosser Ave. , Nestleton",
+    "assessedValue": 171000.0,
     "geometry": null,
     "lat": 44.170115,
     "lng": -78.894457,
@@ -562,6 +597,7 @@
   {
     "pin": "58373-0023",
     "address": null,
+    "assessedValue": 279000.0,
     "geometry": null,
     "lat": 44.708644757,
     "lng": -79.783487904,
@@ -578,6 +614,7 @@
   {
     "pin": "58511-0036",
     "address": null,
+    "assessedValue": 64000.0,
     "geometry": null,
     "lat": 44.708644757,
     "lng": -79.783487904,
@@ -594,6 +631,7 @@
   {
     "pin": "58511-0037",
     "address": null,
+    "assessedValue": 512000.0,
     "geometry": null,
     "lat": 44.708644757,
     "lng": -79.783487904,
@@ -610,6 +648,7 @@
   {
     "pin": "58511-0117",
     "address": null,
+    "assessedValue": 1550000.0,
     "geometry": null,
     "lat": 44.708644757,
     "lng": -79.783487904,
@@ -626,6 +665,7 @@
   {
     "pin": "58508-0010",
     "address": null,
+    "assessedValue": 27000.0,
     "geometry": null,
     "lat": 44.708644757,
     "lng": -79.783487904,
@@ -642,6 +682,7 @@
   {
     "pin": "58501-0067",
     "address": null,
+    "assessedValue": 17200.0,
     "geometry": null,
     "lat": 44.708644757,
     "lng": -79.783487904,
@@ -658,6 +699,7 @@
   {
     "pin": "58505-0087",
     "address": null,
+    "assessedValue": 27000.0,
     "geometry": null,
     "lat": 44.708644757,
     "lng": -79.783487904,
@@ -674,6 +716,7 @@
   {
     "pin": "59340-0020",
     "address": null,
+    "assessedValue": 234000.0,
     "geometry": null,
     "lat": 44.708644757,
     "lng": -79.783487904,
@@ -690,6 +733,7 @@
   {
     "pin": "58484-0344",
     "address": null,
+    "assessedValue": 3830000.0,
     "geometry": null,
     "lat": 44.708644757,
     "lng": -79.783487904,
@@ -706,6 +750,7 @@
   {
     "pin": "58492-0159",
     "address": null,
+    "assessedValue": 143000.0,
     "geometry": null,
     "lat": 44.708644757,
     "lng": -79.783487904,
@@ -722,6 +767,7 @@
   {
     "pin": "58487-0147",
     "address": null,
+    "assessedValue": 10200.0,
     "geometry": null,
     "lat": 44.708644757,
     "lng": -79.783487904,
@@ -738,6 +784,7 @@
   {
     "pin": "58511-0132",
     "address": null,
+    "assessedValue": 157000.0,
     "geometry": null,
     "lat": 44.708644757,
     "lng": -79.783487904,
@@ -754,6 +801,7 @@
   {
     "pin": "58511-0029",
     "address": null,
+    "assessedValue": 84000.0,
     "geometry": null,
     "lat": 44.708644757,
     "lng": -79.783487904,
@@ -770,6 +818,7 @@
   {
     "pin": "65380-0284",
     "address": "715 Gleason Ave. , Holtyre",
+    "assessedValue": 31000.0,
     "geometry": null,
     "lat": 45.078706,
     "lng": -74.871981,
@@ -786,6 +835,7 @@
   {
     "pin": "65380-0147",
     "address": "647 Edward Ave. , Holtyre",
+    "assessedValue": 3100.0,
     "geometry": null,
     "lat": 45.078706,
     "lng": -74.871981,
@@ -802,6 +852,7 @@
   {
     "pin": "65380-0148",
     "address": "649 Edward Ave. , Holtyre",
+    "assessedValue": 3100.0,
     "geometry": null,
     "lat": 45.078706,
     "lng": -74.871981,
@@ -818,6 +869,7 @@
   {
     "pin": "57606-0057",
     "address": "257 Elwoods Rd. , Palmer Rapids",
+    "assessedValue": 34500.0,
     "geometry": null,
     "lat": 45.444849,
     "lng": -77.397577,
@@ -834,6 +886,7 @@
   {
     "pin": "24962-0065",
     "address": null,
+    "assessedValue": null,
     "geometry": null,
     "lat": 43.518328,
     "lng": -79.877465,
@@ -850,6 +903,7 @@
   {
     "pin": "24962-0066",
     "address": null,
+    "assessedValue": null,
     "geometry": null,
     "lat": 43.518328,
     "lng": -79.877465,
@@ -866,6 +920,7 @@
   {
     "pin": "65221-0184",
     "address": "5 Cotter St. , Moosonee",
+    "assessedValue": 154000.0,
     "geometry": null,
     "lat": 51.273089,
     "lng": -80.640049,
@@ -882,6 +937,7 @@
   {
     "pin": "52116-0094",
     "address": null,
+    "assessedValue": 149000.0,
     "geometry": null,
     "lat": 45.347783,
     "lng": -80.034459,
@@ -898,6 +954,7 @@
   {
     "pin": "31448-0306",
     "address": "1356 Cloudslee Rd. , Bruce Mines",
+    "assessedValue": 42000.0,
     "geometry": null,
     "lat": 46.364523702,
     "lng": -83.738003554,
@@ -914,6 +971,7 @@
   {
     "pin": "62469-0523",
     "address": null,
+    "assessedValue": null,
     "geometry": null,
     "lat": 49.018424,
     "lng": -88.255876,
@@ -930,6 +988,7 @@
   {
     "pin": "62470-0133",
     "address": null,
+    "assessedValue": null,
     "geometry": null,
     "lat": 49.018424,
     "lng": -88.255876,
