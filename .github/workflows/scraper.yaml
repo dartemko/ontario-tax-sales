@@ -36,6 +36,9 @@ jobs:
 
       - name: Run Scraper Script
         run: python scraper.py
+        env:
+          LIO_PARCEL_QUERY_URL: ${{ secrets.LIO_PARCEL_QUERY_URL }}
+          LIO_PARCEL_PIN_FIELD: ${{ secrets.LIO_PARCEL_PIN_FIELD }}
 
       - name: Commit and Push Updated Data
         run: |

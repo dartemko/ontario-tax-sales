@@ -90,9 +90,10 @@
       <!-- Main Map -->
       <div class="bg-slate-800 p-4 rounded-xl border border-slate-700 shadow-xl">
         <h2 class="text-lg font-bold mb-3 text-slate-200 flex items-center justify-between">
-          <span>Interactive Regional Map</span>
+          <span>Regional Map</span>
           <span class="text-xs font-normal text-slate-400">Esri Topo Base Engine</span>
         </h2>
+        <p class="text-xs text-slate-400 mb-3">Parcel outlines are shown only when actual boundary geometry is available. Otherwise, markers indicate an approximate township location.</p>
         <div id="main-map"></div>
       </div>
 
@@ -168,7 +169,7 @@
     <div id="scraper-tab" class="tab-content space-y-6">
       <div class="bg-slate-800 p-6 rounded-2xl border border-slate-700 space-y-6 shadow-xl">
         <h2 class="text-2xl font-bold text-amber-400 mb-2">Automated Rescraper Pipeline</h2>
-        <p class="text-sm text-slate-300">Python BeautifulSoup scraper script configured for automated GitHub Actions execution.</p>
+        <p class="text-sm text-slate-300">The scraper can save actual parcel boundaries from an authorized ArcGIS Feature Service. To enable it, add the service layer's query URL as the GitHub Actions secret <code>LIO_PARCEL_QUERY_URL</code>. If the PIN field is not named <code>PIN</code>, set <code>LIO_PARCEL_PIN_FIELD</code> too. The service must allow queries by PIN and support output geometry in WGS 84 (EPSG:4326). Without a configured source or PIN match, no parcel outline is drawn.</p>
       </div>
     </div>
 
@@ -227,8 +228,9 @@
           </div>
 
           <div class="bg-slate-900/60 p-4 rounded-xl border border-slate-700">
-            <h4 class="font-bold text-sm text-slate-300 mb-1">Submission Office & Description</h4>
-            <p class="text-xs text-slate-400 leading-relaxed mb-2" id="modalAddress">Address...</p>
+            <h4 class="font-bold text-sm text-slate-300 mb-1">Property Address & Tender Details</h4>
+            <p class="text-xs text-slate-400 leading-relaxed mb-2" id="modalPropertyAddress">Property address...</p>
+            <p class="text-xs text-slate-400 leading-relaxed mb-2" id="modalAddress">Submission office...</p>
             <p class="text-xs text-slate-400 leading-relaxed" id="modalDescription">Description text...</p>
           </div>
         </div>
@@ -236,6 +238,7 @@
         <div class="space-y-4">
           <div class="bg-slate-900 p-3 rounded-xl border border-slate-700">
             <h4 class="font-bold text-xs text-slate-300 mb-2">Parcel Mini-Map (Satellite View)</h4>
+          <p class="text-xs text-slate-400 mb-2">Exact parcel outline is displayed only when available from the parcel data source.</p>
             <div id="modal-minimap"></div>
           </div>
 
@@ -334,17 +337,24 @@
       }
     ];
 
-    function getAccurateParcelPolygon(lat, lng, acres) {
-      const sideMeters = Math.sqrt((acres || 15) * 4046.86);
-      const latDelta = (sideMeters / 111000) / 2;
-      const lngDelta = (sideMeters / (111000 * Math.cos(lat * Math.PI / 180))) / 2;
+    function hasParcelGeometry(property) {
+      return property.geometry?.type === 'esriGeometryPolygon' &&
+        Array.isArray(property.geometry.rings) &&
+        property.geometry.rings.length > 0 &&
+        property.geometry.rings.every(ring =>
+          Array.isArray(ring) && ring.length >= 4 &&
+          ring.every(point => Array.isArray(point) && point.length >= 2 &&
+            Number.isFinite(point[0]) && Number.isFinite(point[1]) &&
+            Math.abs(point[0]) <= 180 && Math.abs(point[1]) <= 90)
+        );
+    }
 
-      return [
-        [lat + latDelta, lng - lngDelta],
-        [lat + latDelta, lng + lngDelta],
-        [lat - latDelta, lng + lngDelta],
-        [lat - latDelta, lng - lngDelta]
-      ];
+    function createParcelLayer(property, style) {
+      if (!hasParcelGeometry(property)) return null;
+      const rings = property.geometry.rings.map(ring =>
+        ring.map(([lng, lat]) => [lat, lng])
+      );
+      return L.polygon(rings, style);
     }
 
     function hasValidCoordinates(property) {
@@ -414,6 +424,8 @@
               access: "Crown Road Allowance",
               terrain: "Canadian Shield Granite / Forest",
               pin: item.pin || "N/A",
+              propertyAddress: item.address || null,
+              geometry: item.geometry || null,
               lat: coordinates?.lat ?? null,
               lng: coordinates?.lng ?? null,
               crownBorder: true,
@@ -519,14 +531,16 @@
           const marker = L.marker([prop.lat, prop.lng]).addTo(markersGroup);
           marker.bindPopup(createPropertyPopup(prop));
 
-          const polyCoords = getAccurateParcelPolygon(prop.lat, prop.lng, prop.acres);
-          const parcelPoly = L.polygon(polyCoords, {
+        }
+        const parcelLayer = createParcelLayer(prop, {
           color: '#f59e0b',
           weight: 2,
           fillColor: '#f59e0b',
           fillOpacity: 0.35
-          }).addTo(markersGroup);
-          parcelPoly.bindPopup(`<b>${prop.township} Parcel Boundary</b> (${prop.acres} Acres)`);
+        });
+        if (parcelLayer) {
+          parcelLayer.addTo(markersGroup);
+          parcelLayer.bindPopup(`<b>${prop.township} Parcel Boundary</b> (PIN ${prop.pin})`);
         }
 
         const card = document.createElement('div');
@@ -551,24 +565,32 @@
 
           <div class="p-4 pt-0 space-y-2">
             <button onclick="zoomToPropertyPolygon('${prop.id}')" class="w-full bg-slate-700 hover:bg-slate-600 text-amber-400 font-bold py-2 rounded-lg transition-all text-xs uppercase tracking-wider">
-              Focus Map on Parcel
+              ${hasParcelGeometry(prop) ? 'Focus Map on Parcel Boundary' : 'Focus Map on Approximate Location'}
             </button>
             <button onclick="openModal('${prop.id}')" class="w-full bg-amber-500 hover:bg-amber-600 text-slate-900 font-bold py-2 rounded-lg transition-all text-xs uppercase tracking-wider">
               View Details & Form 7 Package
             </button>
           </div>
         `;
+        const address = document.createElement('p');
+        address.className = 'text-xs text-slate-400 px-4 pb-3';
+        address.textContent = `Property address: ${prop.propertyAddress || 'Not stated in Gazette notice'}`;
+        card.appendChild(address);
         container.appendChild(card);
       });
     }
 
     function zoomToPropertyPolygon(id) {
       const prop = rawProperties.find(p => p.id === id);
-      if (!prop || !hasValidCoordinates(prop)) return;
-
-      const polyCoords = getAccurateParcelPolygon(prop.lat, prop.lng, prop.acres);
-      const polyBounds = L.polygon(polyCoords).getBounds();
-      mainMap.fitBounds(polyBounds, { padding: [80, 80] });
+      if (!prop) return;
+      const parcelLayer = createParcelLayer(prop);
+      if (parcelLayer) {
+        mainMap.fitBounds(parcelLayer.getBounds(), { padding: [80, 80] });
+      } else if (hasValidCoordinates(prop)) {
+        mainMap.setView([prop.lat, prop.lng], 15);
+      } else {
+        return;
+      }
       window.scrollTo({ top: 180, behavior: 'smooth' });
     }
 
@@ -584,7 +606,10 @@
       document.getElementById('modalAcres').innerText = `${prop.acres} Acres`;
       document.getElementById('modalAccess').innerText = prop.access;
       document.getElementById('modalFoundation').innerText = prop.foundation;
-      document.getElementById('modalAddress').innerText = prop.submissionAddress;
+      document.getElementById('modalPropertyAddress').innerText =
+        `Property address: ${prop.propertyAddress || 'Not stated in Gazette notice'}`;
+      document.getElementById('modalAddress').innerText =
+        `Submission office: ${prop.submissionAddress || 'See official Gazette notice'}`;
       document.getElementById('modalDescription').innerText = prop.description;
 
       document.getElementById('modalPdfBtn').href = prop.pdfUrl;
@@ -598,22 +623,37 @@
       document.getElementById('propertyModal').classList.remove('hidden');
 
       setTimeout(() => {
-        const polyCoords = getAccurateParcelPolygon(prop.lat, prop.lng, prop.acres);
+        const parcelLayer = createParcelLayer(prop, {
+          color: '#f59e0b',
+          weight: 2,
+          fillColor: '#f59e0b',
+          fillOpacity: 0.4
+        });
+        if (!parcelLayer && !hasValidCoordinates(prop)) return;
+        const mapCenter = parcelLayer?.getBounds().getCenter() ?? [prop.lat, prop.lng];
         if (!modalMap) {
-          modalMap = L.map('modal-minimap').setView([prop.lat, prop.lng], 15);
+          modalMap = L.map('modal-minimap').setView(mapCenter, 15);
           L.tileLayer('https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}', {
             maxZoom: 18,
             attribution: 'Tiles &copy; Esri'
           }).addTo(modalMap);
-          modalMarker = L.marker([prop.lat, prop.lng]).addTo(modalMap);
+          if (hasValidCoordinates(prop)) {
+            modalMarker = L.marker([prop.lat, prop.lng]).addTo(modalMap);
+          }
         } else {
-          modalMap.setView([prop.lat, prop.lng], 15);
-          modalMarker.setLatLng([prop.lat, prop.lng]);
+          if (hasValidCoordinates(prop)) {
+            modalMap.setView([prop.lat, prop.lng], 15);
+            if (modalMarker) modalMarker.setLatLng([prop.lat, prop.lng]);
+            else modalMarker = L.marker([prop.lat, prop.lng]).addTo(modalMap);
+          }
         }
 
         if (modalPolygon) modalMap.removeLayer(modalPolygon);
-        modalPolygon = L.polygon(polyCoords, { color: '#f59e0b', weight: 2, fillColor: '#f59e0b', fillOpacity: 0.4 }).addTo(modalMap);
-        modalMap.fitBounds(modalPolygon.getBounds(), { padding: [30, 30] });
+        modalPolygon = parcelLayer;
+        if (modalPolygon) {
+          modalPolygon.addTo(modalMap);
+          modalMap.fitBounds(modalPolygon.getBounds(), { padding: [30, 30] });
+        }
         modalMap.invalidateSize();
       }, 150);
     }
