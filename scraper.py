@@ -143,6 +143,18 @@ def extract_property_address(text):
         return address
     return None
 
+
+def extract_assessed_value(text):
+    value_match = re.search(
+        r'\bassessed\s+value\s+of\s+(?:the\s+)?land\s*(?:is|:)?\s*\$([\d,]+(?:\.\d{2})?)',
+        text,
+        re.IGNORECASE,
+    )
+    if not value_match:
+        return None
+    return float(value_match.group(1).replace(',', ''))
+
+
 def scrape_tax_sales():
     issue_url = get_latest_gazette_issue_url()
     if not issue_url:
@@ -204,6 +216,7 @@ def scrape_tax_sales():
             listings.append({
                 "pin": pin,
                 "address": extract_property_address(listing_text),
+                "assessedValue": extract_assessed_value(listing_text),
                 "geometry": geometry,
                 "lat": lat,
                 "lng": lng,

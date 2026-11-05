@@ -1,6 +1,10 @@
 import unittest
 
-from scraper import extract_property_address, normalize_parcel_geometry
+from scraper import (
+    extract_assessed_value,
+    extract_property_address,
+    normalize_parcel_geometry,
+)
 
 
 class ExtractPropertyAddressTests(unittest.TestCase):
@@ -28,6 +32,17 @@ class ExtractPropertyAddressTests(unittest.TestCase):
         notice = "Roll No. 25 18 010.094.55520; PT LT 10 BLK 3; PIN # 17140-0320 (LT)"
 
         self.assertIsNone(extract_property_address(notice))
+
+    def test_extracts_assessed_land_value(self):
+        notice = (
+            "According to the last returned assessment roll, the assessed value "
+            "of the land is $260,000.00 Minimum Tender Amount: $28,493.25"
+        )
+
+        self.assertEqual(extract_assessed_value(notice), 260000.0)
+
+    def test_returns_none_when_assessed_value_is_not_stated(self):
+        self.assertIsNone(extract_assessed_value("Minimum Tender Amount: $28,493.25"))
 
     def test_accepts_valid_esri_parcel_polygon(self):
         geometry = {

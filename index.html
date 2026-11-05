@@ -196,6 +196,10 @@
               <span class="font-bold text-amber-400 text-base" id="modalMinBid">$0.00</span>
             </div>
             <div class="flex justify-between border-b border-slate-800 pb-1.5">
+              <span class="text-slate-400">Assessed Land Value:</span>
+              <span class="font-medium text-emerald-300 text-right" id="modalAssessedValue">Not stated in Gazette notice</span>
+            </div>
+            <div class="flex justify-between border-b border-slate-800 pb-1.5">
               <span class="text-slate-400">Tender Closing Date:</span>
               <span class="font-bold text-red-400" id="modalClosingDate">Date</span>
             </div>
@@ -421,6 +425,7 @@
               district: item.district || "Northern District",
               unorganized: true,
               minBid: item.minBid || 0,
+              assessedValue: Number.isFinite(item.assessedValue) ? item.assessedValue : null,
               acres: item.acres || 15.0,
               access: "Crown Road Allowance",
               terrain: "Canadian Shield Granite / Forest",
@@ -558,6 +563,7 @@
               <p class="text-xs text-slate-400">${prop.district} • PIN: ${prop.pin}</p>
               
               <div class="space-y-1 text-xs text-slate-300 pt-2 border-t border-slate-700/50">
+                <div><b class="text-slate-400">Assessed value:</b> ${prop.assessedValue == null ? 'Not stated in Gazette notice' : `$${prop.assessedValue.toLocaleString()} (assessment, not market value)`}</div>
                 <div><b class="text-slate-400">Tender Deadline:</b> <span class="text-red-400 font-medium">${prop.closingDate}</span></div>
                 <div><b class="text-slate-400">Crown Border:</b> ${prop.crownBorder ? 'Yes (Direct Access)' : 'No'}</div>
               </div>
@@ -603,6 +609,10 @@
       document.getElementById('modalDistrict').innerText = prop.district;
       document.getElementById('modalPin').innerText = `PIN / Roll #: ${prop.pin}`;
       document.getElementById('modalMinBid').innerText = `$${prop.minBid.toLocaleString()} CAD`;
+      document.getElementById('modalAssessedValue').innerText =
+        prop.assessedValue == null
+          ? 'Not stated in Gazette notice'
+          : `$${prop.assessedValue.toLocaleString()} CAD (assessment, not market value)`;
       document.getElementById('modalClosingDate').innerText = prop.closingDate;
       document.getElementById('modalAcres').innerText = `${prop.acres} Acres`;
       document.getElementById('modalAccess').innerText = prop.access;
