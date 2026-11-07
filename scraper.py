@@ -4,6 +4,7 @@ import re
 import json
 import math
 import os
+from datetime import date, datetime
 
 SEARCH_URL = "https://www.ontario.ca/search/ontario-gazette"
 BASE_DOMAIN = "https://www.ontario.ca"
@@ -98,23 +99,61 @@ def get_parcel_data_from_pin(pin, township):
     lat, lng = coordinates if coordinates else (None, None)
     return lat, lng, geometry
 
-def get_latest_gazette_issue_url():
-    try:
-        resp = requests.get(SEARCH_URL, headers=HEADERS, timeout=15)
-        if resp.status_code != 200:
-            print(f"Failed to fetch search page: {resp.status_code}")
-            return None
-        soup = BeautifulSoup(resp.content, 'html.parser')
-        for link in soup.find_all('a', href=True):
-            href = link['href']
-            if '/document/ontario-gazette-volume-' in href:
-                full_url = href if href.startswith('http') else BASE_DOMAIN + href
-                if not full_url.endswith('/sale-land-tax-arrears-public-tender'):
-                    full_url = full_url.rstrip('/') + '/sale-land-tax-arrears-public-tender'
-                return full_url
-    except Exception as e:
-        print(f"Error resolving Gazette URL: {e}")
-    return None
+def get_gazette_issue_urls():
+    response = requests.get(SEARCH_URL, headers=HEADERS, timeout=15)
+    response.raise_for_status()
+    soup = BeautifulSoup(response.content, 'html.parser')
+    issue_urls = []
+    seen_urls = set()
+
+    for link in soup.find_all('a', href=True):
+        href = link['href']
+        if not re.search(r'/document/ontario-gazette-volume-\d+-issue-\d+-', href):
+            continue
+        issue_url = href if href.startswith('http') else BASE_DOMAIN + href
+        issue_url = issue_url.split('?', 1)[0].rstrip('/')
+        if not issue_url.endswith('/sale-land-tax-arrears-public-tender'):
+            issue_url += '/sale-land-tax-arrears-public-tender'
+        if issue_url not in seen_urls:
+            seen_urls.add(issue_url)
+            issue_urls.append(issue_url)
+
+    if not issue_urls:
+        raise ValueError("No Gazette issue links found in search results.")
+    return issue_urls
+
+
+def is_tender_active(closing_text, today=None):
+    closing_date_match = re.search(
+        r'\b(?:January|February|March|April|May|June|July|August|September|October|November|December)'
+        r'\s+\d{1,2},\s+\d{4}\b',
+        closing_text or '',
+        re.IGNORECASE,
+    )
+    if not closing_date_match:
+        return False
+
+    closing_date = datetime.strptime(closing_date_match.group(0), '%B %d, %Y').date()
+    return closing_date >= (today or date.today())
+
+
+def extract_tender_closing_date(text):
+    until_match = re.search(r'\buntil\b', text, re.IGNORECASE)
+    if not until_match:
+        return None
+
+    deadline_text = text[until_match.end():until_match.end() + 300]
+    date_match = re.search(
+        r'\b(?:January|February|March|April|May|June|July|August|September|October|November|December)'
+        r'\s+\d{1,2},\s+\d{4}\b',
+        deadline_text,
+        re.IGNORECASE,
+    )
+    if not date_match:
+        return None
+
+    return re.sub(r'\s+', ' ', deadline_text[:date_match.end()]).strip(' ,')
+
 
 def extract_property_address(text):
     municipal_match = re.search(
@@ -140,9 +179,15 @@ def extract_property_address(text):
         if re.match(rf'^\d+[A-Za-z]?(?:-\d+[A-Za-z]?)?\s+.+\b{street_type}\b', address, re.IGNORECASE):
             return address
 
-    being_pin_match = re.search(r'\bbeing\s+PIN\b', text, re.IGNORECASE)
+    description_match = re.search(
+        r'\bDescription\s+of\s+Land(?:\(s\))?\s*:\s*',
+        text,
+        re.IGNORECASE,
+    )
+    property_text = text[description_match.end():] if description_match else text
+    being_pin_match = re.search(r'\bbeing\s+PIN\b', property_text, re.IGNORECASE)
     if being_pin_match:
-        before_pin = text[:being_pin_match.start()]
+        before_pin = property_text[:being_pin_match.start()]
         street_addresses = list(re.finditer(
             rf'\b\d+[A-Za-z]?(?:-\d+[A-Za-z]?)?\s+[^,;]*?\b{street_type}\b',
             before_pin,
@@ -166,81 +211,89 @@ def extract_assessed_value(text):
     return float(value_match.group(1).replace(',', ''))
 
 
-def scrape_tax_sales():
-    issue_url = get_latest_gazette_issue_url()
-    if not issue_url:
-        print("Could not resolve latest Gazette URL.")
-        return []
-
-    print(f"Fetching Gazette page: {issue_url}")
-    resp = requests.get(issue_url, headers=HEADERS, timeout=15)
-    if resp.status_code != 200:
-        print(f"Failed page fetch with status: {resp.status_code}")
-        return []
-
-    soup = BeautifulSoup(resp.content, 'html.parser')
-    
-    # Extract clean text from the main body, discarding top site headers/footers
-    main_area = soup.find('main') or soup.find('article') or soup.body
-    full_text = main_area.get_text(" ", strip=True)
-
-    # Split the document by legal notice headers
-    chunks = re.split(r'(?=SALE OF LAND BY PUBLIC TENDER|Form 6|Municipal Act, 2001)', full_text, flags=re.IGNORECASE)
-
+def scrape_tax_sales(today=None):
+    issue_urls = get_gazette_issue_urls()
     listings = []
     seen_pins = set()
 
-    for chunk in chunks:
-        bid_matches = list(re.finditer(
-            r'Minimum\s+Tender\s+Amount\s*:?\s*\$([\d,]+\.\d{2})',
-            chunk,
-            re.IGNORECASE,
-        ))
-        previous_bid_end = 0
-        muni_match = re.search(r'(Municipality|Township|City|Town|Board)\s+of\s+([A-Za-z\s]+)', chunk, re.IGNORECASE)
-        closing_match = re.search(r'until\s+([\d:]+\s*(?:a\.m\.|p\.m\.)[^\n,]+,\s*\d{4})', chunk, re.IGNORECASE)
+    for issue_url in issue_urls:
+        print(f"Fetching Gazette page: {issue_url}")
+        response = requests.get(issue_url, headers=HEADERS, timeout=15)
+        response.raise_for_status()
+        soup = BeautifulSoup(response.content, 'html.parser')
 
-        for bid_match in bid_matches:
-            listing_text = chunk[previous_bid_end:bid_match.end()]
-            previous_bid_end = bid_match.end()
-            pin_match = re.search(r'PIN\s*#?\s*([\d-]+)', listing_text, re.IGNORECASE)
-            roll_match = re.search(
-                r'Roll\s*(?:(?:#|No\.?|number)\s*)?(\d[\d\s.-]*)',
-                listing_text,
+        main_area = soup.find('main') or soup.find('article') or soup.body
+        full_text = main_area.get_text(" ", strip=True)
+        chunks = re.split(
+            r'(?=SALE OF LAND BY PUBLIC TENDER|Form 6|Municipal Act, 2001)',
+            full_text,
+            flags=re.IGNORECASE,
+        )
+
+        for chunk in chunks:
+            bid_matches = list(re.finditer(
+                r'Minimum\s+Tender\s+Amount\s*:?\s*\$([\d,]+\.\d{2})',
+                chunk,
+                re.IGNORECASE,
+            ))
+            previous_bid_end = 0
+            muni_match = re.search(
+                r'(Municipality|Township|City|Town|Board)\s+of\s+([A-Za-z\s]+)',
+                chunk,
                 re.IGNORECASE,
             )
-            pin = pin_match.group(1) if pin_match else None
-            bid = float(bid_match.group(1).replace(',', ''))
-
-            if not pin or pin in seen_pins:
+            if not re.search(r'\btenders are invited\b', chunk, re.IGNORECASE):
                 continue
+            closing_date = extract_tender_closing_date(chunk)
 
-            seen_pins.add(pin)
-            muni_name = muni_match.group(2).strip() if muni_match else "Ontario Municipality"
-            muni_name = re.split(r"\s+Take Notice\b", muni_name, maxsplit=1, flags=re.IGNORECASE)[0].strip()
-            lat, lng, geometry = get_parcel_data_from_pin(pin, muni_name)
+            for bid_match in bid_matches:
+                listing_text = chunk[previous_bid_end:bid_match.end()]
+                previous_bid_end = bid_match.end()
+                pin_match = re.search(r'PIN\s*#?\s*([\d-]+)', listing_text, re.IGNORECASE)
+                roll_match = re.search(
+                    r'Roll\s*(?:(?:#|No\.?|number)\s*)?(\d[\d\s.-]*)',
+                    listing_text,
+                    re.IGNORECASE,
+                )
+                pin = pin_match.group(1) if pin_match else None
+                bid = float(bid_match.group(1).replace(',', ''))
 
-            clean_desc = re.sub(r'\s+', ' ', listing_text).strip()
-            if len(clean_desc) > 300:
-                clean_desc = clean_desc[:300] + "..."
+                if not pin or pin in seen_pins:
+                    continue
+                seen_pins.add(pin)
+                if not closing_date or not is_tender_active(closing_date, today):
+                    continue
 
-            listings.append({
-                "pin": pin,
-                "address": extract_property_address(listing_text),
-                "assessedValue": extract_assessed_value(listing_text),
-                "geometry": geometry,
-                "lat": lat,
-                "lng": lng,
-                "roll": roll_match.group(1).strip() if roll_match else "N/A",
-                "township": muni_name,
-                "district": "Ontario District",
-                "minBid": bid,
-                "acres": 15.0,
-                "closingDate": closing_match.group(1) if closing_match else "See Official Notice",
-                "noticeUrl": issue_url,
-                "pdfUrl": "https://forms.mgcs.gov.on.ca/dataset/402ef9c5-2da6-4880-98be-e2e897627bcd/resource/31f730ca-c641-4645-8473-9ddd90bea745/download/2205e.pdf",
-                "description": clean_desc
-            })
+                muni_name = muni_match.group(2).strip() if muni_match else "Ontario Municipality"
+                muni_name = re.split(
+                    r"\s+Take Notice\b",
+                    muni_name,
+                    maxsplit=1,
+                    flags=re.IGNORECASE,
+                )[0].strip()
+                lat, lng, geometry = get_parcel_data_from_pin(pin, muni_name)
+
+                clean_desc = re.sub(r'\s+', ' ', listing_text).strip()
+                if len(clean_desc) > 300:
+                    clean_desc = clean_desc[:300] + "..."
+
+                listings.append({
+                    "pin": pin,
+                    "address": extract_property_address(listing_text),
+                    "assessedValue": extract_assessed_value(listing_text),
+                    "geometry": geometry,
+                    "lat": lat,
+                    "lng": lng,
+                    "roll": roll_match.group(1).strip() if roll_match else "N/A",
+                    "township": muni_name,
+                    "district": "Ontario District",
+                    "minBid": bid,
+                    "acres": 15.0,
+                    "closingDate": closing_date,
+                    "noticeUrl": issue_url,
+                    "pdfUrl": "https://forms.mgcs.gov.on.ca/dataset/402ef9c5-2da6-4880-98be-e2e897627bcd/resource/31f730ca-c641-4645-8473-9ddd90bea745/download/2205e.pdf",
+                    "description": clean_desc
+                })
 
     return listings
 
