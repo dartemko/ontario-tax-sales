@@ -14,6 +14,20 @@
     #main-map { height: 460px; width: 100%; border-radius: 0.75rem; z-index: 1 !important; }
     #modal-minimap { height: 200px; width: 100%; border-radius: 0.5rem; z-index: 1 !important; }
     .leaflet-container { z-index: 1 !important; }
+    .listing-count-marker {
+      align-items: center;
+      background: #f59e0b;
+      border: 2px solid #fff;
+      border-radius: 50%;
+      box-shadow: 0 1px 5px rgb(0 0 0 / 50%);
+      color: #0f172a;
+      display: flex;
+      font-size: 12px;
+      font-weight: 700;
+      height: 30px;
+      justify-content: center;
+      width: 30px;
+    }
     .tab-content { display: none; }
     .tab-content.active { display: block; }
   </style>
@@ -527,17 +541,69 @@
       return popup;
     }
 
+    function createLocationPopup(properties) {
+      if (properties.length === 1) return createPropertyPopup(properties[0]);
+
+      const popup = document.createElement('div');
+      popup.style.color = '#0f172a';
+      popup.style.fontFamily = 'sans-serif';
+
+      const title = document.createElement('h3');
+      title.textContent = `${properties.length} listings at this approximate location`;
+      title.style.fontWeight = 'bold';
+      title.style.marginBottom = '8px';
+      popup.appendChild(title);
+
+      properties.forEach(prop => {
+        const row = document.createElement('div');
+        row.style.cssText = 'display:flex;align-items:center;justify-content:space-between;gap:12px;margin-top:6px;';
+
+        const label = document.createElement('span');
+        label.textContent = `${prop.township} · PIN ${prop.pin}`;
+        row.appendChild(label);
+
+        const button = document.createElement('button');
+        button.type = 'button';
+        button.textContent = 'View';
+        button.style.cssText = 'padding:4px 8px;border:0;border-radius:4px;background:#f59e0b;color:#0f172a;font-weight:700;cursor:pointer;';
+        button.addEventListener('click', () => openModal(prop.id));
+        row.appendChild(button);
+        popup.appendChild(row);
+      });
+
+      return popup;
+    }
+
     function renderListings(properties) {
       const container = document.getElementById('listingsGrid');
       container.innerHTML = '';
       markersGroup.clearLayers();
 
+      const locationGroups = new Map();
       properties.forEach(prop => {
-        if (hasValidCoordinates(prop)) {
-          const marker = L.marker([prop.lat, prop.lng]).addTo(markersGroup);
-          marker.bindPopup(createPropertyPopup(prop));
+        if (!hasValidCoordinates(prop)) return;
+        const key = hasParcelGeometry(prop)
+          ? `parcel:${prop.id}`
+          : `approximate:${prop.lat},${prop.lng}`;
+        if (!locationGroups.has(key)) locationGroups.set(key, []);
+        locationGroups.get(key).push(prop);
+      });
 
-        }
+      locationGroups.forEach(group => {
+        const [lat, lng] = [group[0].lat, group[0].lng];
+        const marker = L.marker([lat, lng], {
+          icon: L.divIcon({
+            className: '',
+            html: `<span class="listing-count-marker">${group.length}</span>`,
+            iconSize: [30, 30],
+            iconAnchor: [15, 15]
+          }),
+          title: `${group.length} listing${group.length === 1 ? '' : 's'}`
+        }).addTo(markersGroup);
+        marker.bindPopup(createLocationPopup(group));
+      });
+
+      properties.forEach(prop => {
         const parcelLayer = createParcelLayer(prop, {
           color: '#f59e0b',
           weight: 2,
