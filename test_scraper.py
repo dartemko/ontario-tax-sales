@@ -28,6 +28,17 @@ class ExtractPropertyAddressTests(unittest.TestCase):
 
         self.assertEqual(extract_property_address(notice), "23 Canada Street")
 
+    def test_extracts_address_before_being_pin(self):
+        notice = (
+            "18 Forest Street, Parry Sound, Ontario P2A 2P9 "
+            "being PIN 52116-0094"
+        )
+
+        self.assertEqual(
+            extract_property_address(notice),
+            "18 Forest Street, Parry Sound, Ontario P2A 2P9",
+        )
+
     def test_returns_none_when_notice_has_only_legal_description(self):
         notice = "Roll No. 25 18 010.094.55520; PT LT 10 BLK 3; PIN # 17140-0320 (LT)"
 

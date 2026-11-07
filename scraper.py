@@ -130,17 +130,28 @@ def extract_property_address(text):
         text,
         re.IGNORECASE,
     )
-    if not roll_address_match:
-        return None
-
-    address = re.sub(r'\s+', ' ', roll_address_match.group(1)).strip(' ;,')
     street_type = (
         r'(?:street|st\.?|road|rd\.?|avenue|ave\.?|boulevard|blvd\.?|drive|dr\.?|'
         r'lane|ln\.?|court|ct\.?|crescent|cres\.?|circle|cir\.?|highway|hwy\.?|'
         r'trail|trl\.?|way|parkway|pkwy\.?|place|pl\.?|terrace|terr\.?)'
     )
-    if re.match(rf'^\d+[A-Za-z]?(?:-\d+[A-Za-z]?)?\s+.+\b{street_type}\b', address, re.IGNORECASE):
-        return address
+    if roll_address_match:
+        address = re.sub(r'\s+', ' ', roll_address_match.group(1)).strip(' ;,')
+        if re.match(rf'^\d+[A-Za-z]?(?:-\d+[A-Za-z]?)?\s+.+\b{street_type}\b', address, re.IGNORECASE):
+            return address
+
+    being_pin_match = re.search(r'\bbeing\s+PIN\b', text, re.IGNORECASE)
+    if being_pin_match:
+        before_pin = text[:being_pin_match.start()]
+        street_addresses = list(re.finditer(
+            rf'\b\d+[A-Za-z]?(?:-\d+[A-Za-z]?)?\s+[^,;]*?\b{street_type}\b',
+            before_pin,
+            re.IGNORECASE,
+        ))
+        if street_addresses:
+            address_start = street_addresses[-1].start()
+            return re.sub(r'\s+', ' ', before_pin[address_start:]).strip(' ;,')
+
     return None
 
 
